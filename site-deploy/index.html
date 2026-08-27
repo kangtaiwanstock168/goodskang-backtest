@@ -173,14 +173,11 @@
   </div>
 
   <div class="card">
-    <div class="form-grid">
-      <div><label>股票代號 / 名稱</label><div class="combo"><input type="text" id="stockId" value="2330 台積電" placeholder="例:2330 或 台積電" autocomplete="off"><div id="suggest" class="suggest"></div></div><p class="hint">輸入股票代號或股票名稱皆可</p></div>
-      <div><label>買入日期</label><div class="combo"><input type="text" id="buyDate" readonly placeholder="選擇日期"><span class="cal-ico">📅</span><div class="dp" id="dp-buyDate"></div></div></div>
-      <div><label>賣出日期</label><div class="combo"><input type="text" id="sellDate" readonly placeholder="選擇日期"><span class="cal-ico">📅</span><div class="dp" id="dp-sellDate"></div></div></div>
-      <div><label>初始資金 (元)</label><input type="text" inputmode="numeric" id="capital" value="100,000"></div>
-      <div><label>🥊 比較股票(選填)</label><div class="combo"><input type="text" id="cmpId" value="" placeholder="例:2408 或 南亞科" autocomplete="off"><div id="suggest2" class="suggest"></div></div><p class="hint">同區間、同一張圖疊上另一檔對比走勢與報酬</p></div>
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1 1 240px;"><label>股票代號 / 名稱</label><div class="combo"><input type="text" id="stockId" value="2330 台積電" placeholder="例:2330 或 台積電" autocomplete="off"><div id="suggest" class="suggest"></div></div></div>
+      <div style="flex:0 1 200px; min-width:160px;"><button id="runBtnTop" onclick="run()">🚀 開始分析</button></div>
     </div>
-    <p class="hint" style="margin-top:8px;">⚡ <b style="color:var(--text);">只想看短線動能?打完代號直接按「開始分析」就好</b>——日期金額全都幫你填好了,結果最上方就是五燈檢查表、標註 K 線與盤中動能。<br>📅 預設回測「最近三個月」;想看長期股性,把買入日期往前拉即可,加碼次數會跟著日期自動算好。</p>
+    <p class="hint" style="margin-top:8px;">⚡ <b style="color:var(--text);">打完代號(或名稱)直接按——短線動能、五燈檢查表、標註 K 線馬上出來</b>,日期金額全都有預設,不用填。</p>
     <p style="margin-top:10px; font-size:.85rem; color:var(--muted);">🔥 熱門一鍵回測:
       <button type="button" class="chip" onclick="quickRun('2330 台積電')">台積電</button>
       <button type="button" class="chip" onclick="quickRun('2317 鴻海')">鴻海</button>
@@ -190,6 +187,14 @@
       <button type="button" class="chip" onclick="quickRun('2327 國巨')">國巨</button>
     </p>
     <p id="watchRow" style="display:none; margin-top:8px; font-size:.85rem; color:var(--muted);"></p>
+    <p style="margin:16px 0 10px; padding-top:12px; border-top:1px dashed var(--border); font-size:.9rem; color:var(--gold); font-weight:700;">🐢 想做波段/長期存股回測?往下自訂日期與資金計畫(不改也行,全有預設值):</p>
+    <div class="form-grid">
+      <div><label>買入日期</label><div class="combo"><input type="text" id="buyDate" readonly placeholder="選擇日期"><span class="cal-ico">📅</span><div class="dp" id="dp-buyDate"></div></div></div>
+      <div><label>賣出日期</label><div class="combo"><input type="text" id="sellDate" readonly placeholder="選擇日期"><span class="cal-ico">📅</span><div class="dp" id="dp-sellDate"></div></div></div>
+      <div><label>初始資金 (元)</label><input type="text" inputmode="numeric" id="capital" value="100,000"></div>
+      <div><label>🥊 比較股票(選填)</label><div class="combo"><input type="text" id="cmpId" value="" placeholder="例:2408 或 南亞科" autocomplete="off"><div id="suggest2" class="suggest"></div></div><p class="hint">同區間、同一張圖疊上另一檔對比走勢與報酬</p></div>
+    </div>
+    <p class="hint" style="margin-top:8px;">📅 預設回測「最近三個月」;想看長期股性,把買入日期往前拉即可,加碼次數會跟著日期自動算好。</p>
     <div class="fund-row">
       <div class="fund-box" style="border-color:var(--gold); background:rgba(210,153,34,.06);">
         <div class="fund-title" style="color:var(--gold);">🔒 想單筆買入後完全不動?</div>
@@ -309,7 +314,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-G|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2653,6 +2658,7 @@ async function run(auto){
   if(dcaCount > 0 && !(dcaAmount > 0)){ status.className='error'; status.textContent='請輸入每次加碼金額'; return; }
 
   $('runBtn').disabled = true;
+  if($('runBtnTop')) $('runBtnTop').disabled = true;
   status.textContent = '抓取歷史資料中…';
   try{
     // 多抓前 150 天做均線暖身,讓 M5/M20/M60 從波段第一天就算得準
@@ -2855,6 +2861,7 @@ async function run(auto){
     status.textContent = '❌ ' + e.message;
   }finally{
     $('runBtn').disabled = false;
+    if($('runBtnTop')) $('runBtnTop').disabled = false;
   }
 }
 </script>
