@@ -294,7 +294,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260827-L|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260827-M|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2079,6 +2079,10 @@ function taChecklist(s){
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="down">不利</b>——順勢原則:當沖也只做日K趨勢的方向,空頭日不硬做多。`
     : score >= 3
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="up">相對友善</b>(${score}/4 綠燈)——但短線成敗在盤中紀律,環境好不等於會賺。`
+    : (phase === '打底' && (score >= 1 || nearNeck))
+    ? `🚦 綜合:日K處於<b style="color:var(--gold);">打底轉強醞釀期</b>(${score}/4 綠燈)——還不到全面做多,但已不是死盤。短線只宜輕倉試單,鎖住兩個價位:收盤站過頸線 <b>${fmt(neck)}</b> 環境升級,跌破 <b>${fmt(lastLow)}</b> 無條件走人。`
+    : phase === '作頭'
+    ? `🚦 綜合:日K出現<b class="down">作頭疑慮</b>(${score}/4 綠燈)——反彈不追,短線做多先縮手;跌破 <b>${fmt(lastLow)}</b> 轉空確認。`
     : `🚦 綜合:日K環境<b style="color:var(--gold);">中性</b>(${score}/4 綠燈)——訊號不齊,短線寧可少做,等綠燈變多。`;
   return {items, score, stop, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n};
 }
@@ -2379,7 +2383,11 @@ async function renderAiInsight(stockId, name){
       ? `<b style="color:var(--gold);">同步 ${pct(Math.abs(relDiff)).replace('+','')}</b>`
       : `<b class="${cls(relDiff)}">${relDiff >= 0 ? '強' : '弱'} ${pct(Math.abs(relDiff)).replace('+','')}</b>`}</span>`;
     if(ckObj){
-      const light = ckObj.verdict.includes('不利') ? '<b class="down">不利 🔴</b>' : ckObj.verdict.includes('友善') ? '<b class="up">友善 🟢</b>' : '<b style="color:var(--gold);">中性 🟡</b>';
+      const light = ckObj.verdict.includes('不利') ? '<b class="down">不利 🔴</b>'
+        : ckObj.verdict.includes('友善') ? '<b class="up">友善 🟢</b>'
+        : ckObj.verdict.includes('醞釀') ? '<b style="color:var(--gold);">醞釀 🟡</b>'
+        : ckObj.verdict.includes('作頭') ? '<b class="down">警戒 🟠</b>'
+        : '<b style="color:var(--gold);">中性 🟡</b>';
       pills += `<span class="pill">短線環境 ${light}</span>`;
       pills += `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ckObj.lastLow)}</b></span>`;
     }
@@ -2395,7 +2403,7 @@ async function renderAiInsight(stockId, name){
     let ckBoxHtml = '';
     if(ckObj){
       // 🚦 燈號橫幅放最上面——當沖客一眼要的就是這個
-      const bad = ckObj.verdict.includes('不利'), good = ckObj.verdict.includes('友善');
+      const bad = ckObj.verdict.includes('不利') || ckObj.verdict.includes('作頭'), good = ckObj.verdict.includes('友善');
       const bc = bad ? 'var(--green)' : good ? 'var(--red)' : 'var(--gold)';
       const bg = bad ? 'rgba(63,185,80,.08)' : good ? 'rgba(248,81,73,.08)' : 'rgba(210,153,34,.08)';
       ckBoxHtml = `<div style="${subBox}"><p style="font-weight:700; margin:0 0 8px; color:var(--gold);">📐 順勢技術檢查表(${ckObj.score}/4 綠燈)</p>`
