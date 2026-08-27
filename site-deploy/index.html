@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>阿康的台股 AI 作戰室｜強勢股雷達・順勢檢查表・波段回測</title>
-<meta name="description" content="免費台股回測工具:輸入股票代號,一次比較六種投資策略(定期定額、回檔加碼狙擊、停利接回、落袋為安),附 AI 近況解析、回檔統計與大盤對照。免費、免註冊,手機電腦都能用。">
+<meta name="description" content="免費台股 AI 工具:盤後強勢股雷達、五燈技術檢查表(趨勢/量價/法人籌碼/防守位)、AI 標註 K 線圖,加上六種策略回測與真實年化 IRR——短線當沖、波段操作、長期存股都適用。免費、免註冊,手機電腦都能用。">
 <meta property="og:title" content="阿康的台股 AI 作戰室｜強勢股雷達×順勢檢查表×六策略回測">
-<meta property="og:description" content="定期定額還是等回檔?停利要不要接回?輸入股票代號,30 秒讓數據告訴你答案。免費、免註冊。">
+<meta property="og:description" content="今天誰在噴?這檔現在什麼狀態?長期怎麼買最划算?雷達×檢查表×回測,一站看完。免費、免註冊。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://goodskangtaiwanstock.netlify.app/">
 <meta name="author" content="阿康 goodskang">
@@ -144,18 +144,26 @@
 <div class="container">
   <header>
     <h1>📈 阿康的台股 <span>AI 作戰室</span></h1>
-    <p>每檔股票都有自己的股性——漲多跌多、漲少跌少,各不相同。<br>
-    輸入代號、買賣日期與資金計畫,一秒算出波段報酬、振幅與最佳賣點。</p>
-    <div style="margin:14px auto 0; max-width:560px; border:1px solid var(--gold); border-radius:12px; padding:12px 18px; background:rgba(210,153,34,.08);">
-      <p style="color:var(--text); font-weight:700; font-size:1.02rem; line-height:1.8;">告訴你這檔股票適合哪種操作?<br>
-      <span style="color:var(--gold);">是定期定額?回檔才加碼?預留現金狙擊?<br>
-      還是特定區間要停利和加碼?</span><br>
-      <span style="color:var(--accent);">✦ 一共提供你六種操作策略 ✦</span></p>
+    <p>每檔股票都有自己的股性——短線有短線的戲,長線有長線的答案。<br>
+    今天誰在噴、這檔現在什麼狀態、長期怎麼買最划算——一站看完。</p>
+    <div style="margin:14px auto 0; max-width:640px; border:1px solid var(--gold); border-radius:12px; padding:12px 18px; background:rgba(210,153,34,.08);">
+      <p style="color:var(--text); font-weight:700; font-size:1.02rem; line-height:1.9;">你是哪一種投資人?這裡都有你的武器<br>
+      <span style="color:var(--gold);">⚡ 短線當沖:盤後強勢股雷達+五燈檢查表(趨勢/均線/量價/法人/防守)<br>
+      📈 波段操作:AI 標註 K 線、頸線與移動防守、盤中即時動能<br>
+      🐢 長期存股:六種策略回測、定期定額 vs 單筆、真實年化 IRR</span><br>
+      <span style="color:var(--accent);">✦ 免費・免註冊・手機電腦都能用 ✦</span></p>
     </div>
-    <p style="margin-top:12px;">這個工具把歷史數據攤開給你看,讓你多一份參考、少一分瞎猜。</p>
+    <p style="margin-top:12px;">不報明牌、不喊進出——把數據攤開,你自己做決定。</p>
   </header>
 
   <div class="card" id="watchBoard" style="display:none;"></div>
+
+  <div class="card" id="topicCard" style="display:none;">
+    <h2 class="section">📰 話題雷達——新聞正在追的股票</h2>
+    <p class="subtitle">昨晚到現在,哪些股票被新聞點名最多次?統計主流財經媒體<b style="color:var(--text);">報導則數</b>排序(客觀計數,非推薦)——蘋果發表會、輝達財報這種大事,相關供應鏈會自己浮上來。點卡片直接跑檢查表+回測:</p>
+    <div class="stats" id="topicBox"></div>
+    <p class="hint" style="margin-top:8px;" id="topicHint"></p>
+  </div>
 
   <div class="card" id="radarCard" style="display:none;">
     <h2 class="section">⚡ 盤後強勢股雷達——今天市場最有戲的股票</h2>
@@ -172,7 +180,7 @@
       <div><label>初始資金 (元)</label><input type="text" inputmode="numeric" id="capital" value="100,000"></div>
       <div><label>🥊 比較股票(選填)</label><div class="combo"><input type="text" id="cmpId" value="" placeholder="例:2408 或 南亞科" autocomplete="off"><div id="suggest2" class="suggest"></div></div><p class="hint">同區間、同一張圖疊上另一檔對比走勢與報酬</p></div>
     </div>
-    <p class="hint" style="margin-top:8px;">📅 預設回測「最近三個月」——剛好一季,不長不短的小波段;想看長期股性,把買入日期往前拉即可,加碼次數會跟著日期自動算好。</p>
+    <p class="hint" style="margin-top:8px;">⚡ <b style="color:var(--text);">只想看短線動能?打完代號直接按「開始分析」就好</b>——日期金額全都幫你填好了,結果最上方就是五燈檢查表、標註 K 線與盤中動能。<br>📅 預設回測「最近三個月」;想看長期股性,把買入日期往前拉即可,加碼次數會跟著日期自動算好。</p>
     <p style="margin-top:10px; font-size:.85rem; color:var(--muted);">🔥 熱門一鍵回測:
       <button type="button" class="chip" onclick="quickRun('2330 台積電')">台積電</button>
       <button type="button" class="chip" onclick="quickRun('2317 鴻海')">鴻海</button>
@@ -199,7 +207,7 @@
         <p class="hint">單筆進場後留在口袋,等回檔門檻觸發時一次 All in</p>
       </div>
     </div>
-    <div style="margin-top:16px; max-width:320px;"><button id="runBtn" onclick="run()">開始回測</button></div>
+    <div style="margin-top:16px; max-width:320px;"><button id="runBtn" onclick="run()">🚀 開始分析</button></div>
     <div class="fee-row">
       <input type="checkbox" id="fee" checked>
       <label for="fee" style="margin:0;">計入交易成本(手續費 0.1425% + 賣出證交稅 0.3%)</label>
@@ -301,7 +309,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-D|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-G|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -592,6 +600,7 @@ function updateDcaHint(){
   renderWatch();
   renderWatchBoard();   // 回訪者的每日看板:背景載入,不擋自動示範
   renderRadar();        // 盤後強勢股雷達:背景載入
+  renderTopic();        // 話題雷達(新聞熱度):背景載入
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
   setTimeout(() => { try{ run(true); }catch(e){} }, fromShare ? 400 : 1200);
 })();
@@ -2012,6 +2021,43 @@ async function renderRadar(){
   }catch(e){}
 }
 
+// 📰 話題雷達:伺服器統計主流資產池近一日新聞報導則數,照熱度排序——昨晚的新聞決定今早散戶想查什麼
+async function renderTopic(){
+  const card = $('topicCard'), box = $('topicBox');
+  try{
+    const r = await fetch('/.netlify/functions/news');
+    if(!r.ok) return;
+    const j = await r.json();
+    const top = (j && j.top) || [];
+    if(top.length < 3) return;
+    // 等股名清單載入(最多 3 秒),沒有就顯示代號
+    for(let w = 0; w < 10 && !stockList; w++) await new Promise(rs => setTimeout(rs, 300));
+    const nameOf = id => { const hit = (stockList || []).find(s2 => s2.id === id); return hit ? hit.name : id; };
+    // 盤中/收盤後帶即時價
+    let lm = {};
+    const nD = new Date(), nM = nD.getHours() * 60 + nD.getMinutes();
+    if(nD.getDay() >= 1 && nD.getDay() <= 5 && nM >= 540){
+      try{ lm = await fetchLiveBatch(top.map(x => x.id)); }catch(e){ lm = {}; }
+    }
+    box.innerHTML = top.map(x => {
+      const nm = nameOf(x.id).replace(/[<>'"]/g, '');
+      const lv = lm[x.id];
+      const hasP = lv && lv.p > 0 && lv.prev > 0;
+      const d1 = hasP ? (lv.p - lv.prev) / lv.prev * 100 : 0;
+      const mid = hasP
+        ? `<div class="${cls(d1)}" style="font-size:1.35rem; font-weight:800; line-height:1.2;">${fmt(lv.p)}</div><div class="${cls(d1)}" style="font-size:.85rem; font-weight:700;">${pct(d1)}</div>`
+        : `<div style="font-size:1.2rem; font-weight:800; color:var(--accent); line-height:1.4;">📰 ${x.n} 則</div>`;
+      return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
+        + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:var(--gold); font-weight:700;">${x.n} 則報導</span></div>`
+        + mid
+        + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}</div></div>`;
+    }).join('');
+    $('topicHint').textContent = `統計日:${j.day}|已濾除論壇貼文|報導多=市場在看,不代表該買——點進去看五燈檢查表和回測,自己判斷。`;
+    card.style.display = 'block';
+    track('topic', {n: top.length});
+  }catch(e){}
+}
+
 // 📤 分享:複製「點開自動回測這檔」的連結,散戶最愛在群組討論股票——讓工具跟著討論串傳播
 let lastRunInfo = null;
 function doShare(){
@@ -2078,6 +2124,8 @@ function taChecklist(s, instNet){
   if(trend !== '多頭' && neckTop > 0 && last.close > neckTop * (1 + TH) && last.close > ma20 && ma20 > ma20p){
     trend = '多頭'; sustained = true;
   }
+  // 一致性覆寫:結構還掛「空頭」但價格已站回上彎月線=舊空頭頭腳已被市場否定,降級為盤整(後面可再觸發轉多/打底判定)
+  if(trend === '空頭' && last.close > ma20 && ma20 > ma20p) trend = '盤整';
   // 量能先算(趨勢升級要用):今量相對前五日均量
   const vols = s.map(d => d.Trading_Volume || 0);
   const v5 = (vols[i-1] + vols[i-2] + vols[i-3] + vols[i-4] + vols[i-5]) / 5;
@@ -2316,10 +2364,13 @@ async function renderAiInsight(stockId, name){
     const stL = new Date(now); stL.setDate(stL.getDate() - 160);   // 個股多抓:順勢檢查表需要 60MA 與頭底轉折
     const startL = `${stL.getFullYear()}-${p2(stL.getMonth()+1)}-${p2(stL.getDate())}`;
     const clean = arr => (arr || []).filter(d => d.open > 0 && d.max > 0 && d.min > 0 && d.close > 0).sort((a,b) => a.date.localeCompare(b.date));
-    const [sRaw, bRaw, instRaw] = await Promise.all([
+    const [sRaw, bRaw, instRaw, newsRaw] = await Promise.all([
       fetchPrices(stockId, startL, end).catch(() => []),
       stockId === '0050' ? Promise.resolve([]) : fetchPrices('0050', start, end).catch(() => []),
-      fmData(`dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stockId}&start_date=${start}&end_date=${end}`).then(j => j.data || []).catch(() => null)
+      fmData(`dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stockId}&start_date=${start}&end_date=${end}`).then(j => j.data || []).catch(() => null),
+      (() => { const nd = new Date(now); nd.setDate(nd.getDate() - 4);
+        const ns = `${nd.getFullYear()}-${p2(nd.getMonth()+1)}-${p2(nd.getDate())}`;
+        return fmData(`dataset=TaiwanStockNews&data_id=${stockId}&start_date=${ns}&end_date=${end}`).then(j => j.data || []).catch(() => null); })()
     ]);
     // 外資+投信近 5 個交易日合計買賣超(股)——給檢查表第五項「法人籌碼」
     let instNet = null;
@@ -2558,7 +2609,23 @@ async function renderAiInsight(stockId, name){
         + rows.map(r2 => `<p style="margin:5px 0; line-height:1.7; font-size:.95rem;">• ${r2}</p>`).join('')
         + `<p class="hint" style="margin-top:6px;">即時姿態描述,非買賣指示;當沖請自設停損並嚴格執行。</p></div>`;
     }
-    box.innerHTML = `<div style="margin-bottom:2px;">${pills}</div>` + dayHtml + chartHtml
+    // 📰 近期新聞標題(公開資訊呈現)——技術面和消息面同框,題材股一眼看到「為什麼漲」
+    let newsHtml = '';
+    try{
+      if(Array.isArray(newsRaw) && newsRaw.length){
+        const esc = t => String(t || '').replace(/[<>&"']/g, '').trim();
+        const seen = new Set(), top = [];
+        for(let i2 = newsRaw.length - 1; i2 >= 0 && top.length < 3; i2--){
+          const nw = newsRaw[i2], t = esc(nw.title).slice(0, 42);
+          if(!t || seen.has(t)) continue;
+          seen.add(t); top.push({t, link: (nw.link || '').startsWith('http') ? nw.link : '', d: String(nw.date || '').slice(5, 10)});
+        }
+        if(top.length) newsHtml = `<div style="margin:8px 0 4px; font-size:.88rem; color:var(--muted); line-height:1.7;">📰 <b>近期新聞</b>:`
+          + top.map(nw => `<div style="margin:3px 0;">・${nw.link ? `<a href="${nw.link}" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">${nw.t}</a>` : nw.t} <span style="opacity:.6;">(${nw.d})</span></div>`).join('')
+          + `</div>`;
+      }
+    }catch(e){}
+    box.innerHTML = `<div style="margin-bottom:2px;">${pills}</div>` + newsHtml + dayHtml + chartHtml
       + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`;
     try{ if(ckObj) drawKChart($('kchart'), s.slice(-45), ckObj); }catch(e){}
   }catch(e){ card.style.display = 'none'; /* 解析失敗就收起,不影響主回測 */ }
