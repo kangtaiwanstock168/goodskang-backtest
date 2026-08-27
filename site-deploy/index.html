@@ -167,7 +167,7 @@
 
   <div class="card" id="radarCard" style="display:none;">
     <h2 class="section">⚡ 盤後強勢股雷達——今天市場最有戲的股票</h2>
-    <p class="subtitle">官方最新收盤全市場掃描:漲幅 ≥5%、成交值 ≥1 億(上市+上櫃個股)——<b style="color:var(--text);">點任一檔直接跑完整檢查表與回測</b>。僅為客觀數據排序,非選股建議。</p>
+    <p class="subtitle">官方最新收盤全市場掃描:<b style="color:var(--accent);">🔥 人氣王</b>(成交值最大的上漲權值股)+<b style="color:var(--red);">強勢股</b>(漲幅 ≥5%、成交值 ≥1 億)——<b style="color:var(--text);">點任一檔直接跑完整檢查表與回測</b>。僅為客觀數據排序,非選股建議。</p>
     <div class="stats" id="radarBox"></div>
     <p class="hint" style="margin-top:8px;">資料:證交所/櫃買開放資料(盤後更新)。想知道這種噴法「歷史上之後都怎麼演」?點下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
   </div>
@@ -314,7 +314,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-I|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -570,6 +570,16 @@ function updateDcaHint(){
   $('dcaCount').value = 3;
   $('dcaAmount').value = '10,000';
   updateDcaHint();
+  // 進站排序:表單(代號+開始分析)最先 → 話題雷達 → 強勢雷達 → 觀察站;回訪者(有觀察名單)則觀察站優先於雷達
+  try{
+    const wb = $('watchBoard'), cont = wb.parentNode;
+    const formCard = $('stockId').closest('.card');
+    cont.insertBefore(formCard, wb);   // DOM 原序:觀察站→話題→強勢→表單;表單插到最前
+    if(!loadWatch().length){           // 新客:雷達們排在觀察站前
+      cont.insertBefore($('topicCard'), wb);
+      cont.insertBefore($('radarCard'), wb);
+    }
+  }catch(e){}
   // 分享連結進站:完整重現分享者當下的所有設定(股票、日期、資金、加碼、比較股)
   let fromShare = false;
   try{
@@ -2009,14 +2019,18 @@ async function renderRadar(){
             list.push({id, name: x.CompanyName || id, c, pct: ch / prev * 100, val});
         }
       }catch(e){}
-      hot = list.filter(x => x.pct >= 5).sort((a, b) => b.pct - a.pct).slice(0, 12);
+      const h9 = list.filter(x => x.pct >= 5).sort((a, b) => b.pct - a.pct).slice(0, 9);
+      const used = new Set(h9.map(x => x.id));
+      const kings = list.filter(x => x.pct >= 2 && !used.has(x.id)).sort((a, b) => b.val - a.val).slice(0, 3).map(x => Object.assign({}, x, {k: 1}));
+      hot = kings.concat(h9);
     }
     if(hot.length < 3) return;   // 官方資料未更新或全場弱勢,安靜不顯示
     hot = hot.slice(0, 12);
     box.innerHTML = hot.map(h => {
       const lu = h.pct >= 9.4, label = (h.name || h.id).replace(/[<>'"]/g, '');
+      const tag = h.k ? '<span style="color:var(--accent); font-weight:700;">🔥 人氣</span>' : (lu ? '<span style="color:var(--red); font-weight:700;">🔒 漲停</span>' : '<span style="opacity:.7;">強勢</span>');
       return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
-        + `<div class="label">${label}<span style="float:right; font-size:.7rem; ${lu ? 'color:var(--red); font-weight:700;' : 'opacity:.7;'}">${lu ? '🔒 漲停' : '強勢'}</span></div>`
+        + `<div class="label">${label}<span style="float:right; font-size:.7rem;">${tag}</span></div>`
         + `<div class="up" style="font-size:1.4rem; font-weight:800; line-height:1.2;">${fmt(h.c)}</div>`
         + `<div class="up" style="font-size:.88rem; font-weight:700; margin-top:2px;">▲ ${pct(h.pct)}</div>`
         + `<div class="sub">成交 ${(h.val / 1e8).toFixed(1)} 億</div></div>`;
