@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>阿康的台股波段回測器</title>
+<title>阿康的台股 AI 作戰室｜強勢股雷達・順勢檢查表・波段回測</title>
 <meta name="description" content="免費台股回測工具:輸入股票代號,一次比較六種投資策略(定期定額、回檔加碼狙擊、停利接回、落袋為安),附 AI 近況解析、回檔統計與大盤對照。免費、免註冊,手機電腦都能用。">
-<meta property="og:title" content="阿康的台股波段回測器|六種策略免費回測">
+<meta property="og:title" content="阿康的台股 AI 作戰室｜強勢股雷達×順勢檢查表×六策略回測">
 <meta property="og:description" content="定期定額還是等回檔?停利要不要接回?輸入股票代號,30 秒讓數據告訴你答案。免費、免註冊。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://goodskangtaiwanstock.netlify.app/">
@@ -17,7 +17,7 @@
 <meta name="copyright" content="© 2026 阿康(goodskang)版權所有。本工具之程式碼、介面設計與文案受著作權法保護,未經授權禁止複製、改作或商業使用。">
 <!--
   ============================================================
-  阿康的台股波段回測器 © 2026 goodskang. All rights reserved.
+  阿康的台股 AI 作戰室 © 2026 goodskang. All rights reserved.
   本網站之原始碼、六策略回測設計、介面與文案均為原創作品,
   受中華民國著作權法及國際著作權公約保護。
   未經作者書面授權,禁止複製、改作、散布或商業使用。
@@ -143,7 +143,7 @@
 <body>
 <div class="container">
   <header>
-    <h1>📈 阿康的台股<span>波段回測器</span></h1>
+    <h1>📈 阿康的台股 <span>AI 作戰室</span></h1>
     <p>每檔股票都有自己的股性——漲多跌多、漲少跌少,各不相同。<br>
     輸入代號、買賣日期與資金計畫,一秒算出波段報酬、振幅與最佳賣點。</p>
     <div style="margin:14px auto 0; max-width:560px; border:1px solid var(--gold); border-radius:12px; padding:12px 18px; background:rgba(210,153,34,.08);">
@@ -301,7 +301,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260827-P|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -310,7 +310,7 @@
 
 <script>
 // © 2026 阿康(goodskang)版權所有。原作:IG @goodskang / YouTube @goodskang
-console.log('%c📈 阿康的台股波段回測器', 'font-size:16px; font-weight:bold; color:#d29922;');
+console.log('%c📈 阿康的台股 AI 作戰室', 'font-size:16px; font-weight:bold; color:#d29922;');
 console.log('%c© 2026 goodskang 版權所有。本工具為原創作品,歡迎分享網址,但請勿複製原始碼另行架設或商業使用。\n喜歡這個工具?追蹤 IG @goodskang、訂閱 YouTube @goodskang 支持阿康!', 'color:#8b949e;');
 
 // 📈 匿名使用統計(GA4):把下面的 GA_ID 換成你的評估 ID(格式 G-XXXXXXXXXX)即自動啟用;留空 = 完全不統計
@@ -1970,26 +1970,35 @@ async function renderRadar(){
   const card = $('radarCard'), box = $('radarBox');
   try{
     const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g, '')); return isFinite(n) ? n : 0; };
-    const list = [];
+    // 首選:自家函式伺服器端掃描(免 CORS、全站共用快取);失敗才退回瀏覽器直連
+    let hot = [];
     try{
-      const arr = await (await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL')).json();
-      for(const x of (arr || [])){
-        const c = num(x.ClosingPrice), ch = num(x.Change), val = num(x.TradeValue), prev = c - ch;
-        if(c >= 10 && prev > 0 && val >= 1e8 && /^[1-9][0-9]{3}$/.test(x.Code || ''))
-          list.push({id: x.Code, name: x.Name, c, pct: ch / prev * 100, val});
-      }
+      const r = await fetch('/.netlify/functions/scan');
+      if(r.ok){ const j = await r.json(); if(Array.isArray(j)) hot = j; }
     }catch(e){}
-    try{
-      const arr = await (await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes')).json();
-      for(const x of (arr || [])){
-        const id = x.SecuritiesCompanyCode || x.Code;
-        const c = num(x.Close), ch = num(x.Change), val = num(x.TransactionAmount), prev = c - ch;
-        if(c >= 10 && prev > 0 && val >= 1e8 && /^[1-9][0-9]{3}$/.test(id || ''))
-          list.push({id, name: x.CompanyName || id, c, pct: ch / prev * 100, val});
-      }
-    }catch(e){}
-    const hot = list.filter(x => x.pct >= 5).sort((a, b) => b.pct - a.pct).slice(0, 12);
+    if(hot.length < 3){
+      const list = [];
+      try{
+        const arr = await (await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL')).json();
+        for(const x of (arr || [])){
+          const c = num(x.ClosingPrice), ch = num(x.Change), val = num(x.TradeValue), prev = c - ch;
+          if(c >= 10 && prev > 0 && val >= 1e8 && /^[1-9][0-9]{3}$/.test(x.Code || ''))
+            list.push({id: x.Code, name: x.Name, c, pct: ch / prev * 100, val});
+        }
+      }catch(e){}
+      try{
+        const arr = await (await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes')).json();
+        for(const x of (arr || [])){
+          const id = x.SecuritiesCompanyCode || x.Code;
+          const c = num(x.Close), ch = num(x.Change), val = num(x.TransactionAmount), prev = c - ch;
+          if(c >= 10 && prev > 0 && val >= 1e8 && /^[1-9][0-9]{3}$/.test(id || ''))
+            list.push({id, name: x.CompanyName || id, c, pct: ch / prev * 100, val});
+        }
+      }catch(e){}
+      hot = list.filter(x => x.pct >= 5).sort((a, b) => b.pct - a.pct).slice(0, 12);
+    }
     if(hot.length < 3) return;   // 官方資料未更新或全場弱勢,安靜不顯示
+    hot = hot.slice(0, 12);
     box.innerHTML = hot.map(h => {
       const lu = h.pct >= 9.4, label = (h.name || h.id).replace(/[<>'"]/g, '');
       return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
@@ -2008,12 +2017,12 @@ let lastRunInfo = null;
 function doShare(){
   if(!lastRunInfo) return;
   const url = `${location.origin}${location.pathname}?${lastRunInfo.qs || 's=' + lastRunInfo.id}`;
-  const txt = `📊 我用「阿康的台股波段回測器」回測了 ${lastRunInfo.id} ${lastRunInfo.name}(${lastRunInfo.b} → ${lastRunInfo.e})\n六種策略排名、AI 近況解析、回檔統計,免費一次看`;
+  const txt = `📊 我用「阿康的台股 AI 作戰室」回測了 ${lastRunInfo.id} ${lastRunInfo.name}(${lastRunInfo.b} → ${lastRunInfo.e})\n六種策略排名、AI 近況解析、回檔統計,免費一次看`;
   track('share', {stock: lastRunInfo.id, stock_name: lastRunInfo.name});
   // 只有手機/平板叫原生分享面板(直接傳 LINE/IG);電腦版的系統面板只有 AirDrop 郵件那些,不如直接複製
   const isTouch = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
   if(isTouch && navigator.share){
-    navigator.share({title: '阿康的台股波段回測器', text: txt, url}).catch(() => {});
+    navigator.share({title: '阿康的台股 AI 作戰室', text: txt, url}).catch(() => {});
     return;
   }
   const full = txt + '\n👉 ' + url;
