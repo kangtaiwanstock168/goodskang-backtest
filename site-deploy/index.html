@@ -157,6 +157,13 @@
 
   <div class="card" id="watchBoard" style="display:none;"></div>
 
+  <div class="card" id="radarCard" style="display:none;">
+    <h2 class="section">⚡ 盤後強勢股雷達——今天市場最有戲的股票</h2>
+    <p class="subtitle">官方最新收盤全市場掃描:漲幅 ≥5%、成交值 ≥1 億(上市+上櫃個股)——<b style="color:var(--text);">點任一檔直接跑完整檢查表與回測</b>。僅為客觀數據排序,非選股建議。</p>
+    <div class="stats" id="radarBox"></div>
+    <p class="hint" style="margin-top:8px;">資料:證交所/櫃買開放資料(盤後更新)。想知道這種噴法「歷史上之後都怎麼演」?點下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
+  </div>
+
   <div class="card">
     <div class="form-grid">
       <div><label>股票代號 / 名稱</label><div class="combo"><input type="text" id="stockId" value="2330 台積電" placeholder="例:2330 或 台積電" autocomplete="off"><div id="suggest" class="suggest"></div></div><p class="hint">輸入股票代號或股票名稱皆可</p></div>
@@ -294,7 +301,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260827-O|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260827-P|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -584,6 +591,7 @@ function updateDcaHint(){
   }catch(e){}
   renderWatch();
   renderWatchBoard();   // 回訪者的每日看板:背景載入,不擋自動示範
+  renderRadar();        // 盤後強勢股雷達:背景載入
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
   setTimeout(() => { try{ run(true); }catch(e){} }, fromShare ? 400 : 1200);
 })();
@@ -1954,6 +1962,44 @@ async function renderWatchBoard(){
       refreshWatchBoard();
       if(!isMktOpen() && watchTimer){ clearInterval(watchTimer); watchTimer = null; }
     }, 60000);
+  }catch(e){}
+}
+
+// ⚡ 盤後強勢股雷達:證交所+櫃買官方全市場收盤兩次請求抓齊,客觀排序——刺激當入口,點進去接的是紀律(檢查表+回測)
+async function renderRadar(){
+  const card = $('radarCard'), box = $('radarBox');
+  try{
+    const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g, '')); return isFinite(n) ? n : 0; };
+    const list = [];
+    try{
+      const arr = await (await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL')).json();
+      for(const x of (arr || [])){
+        const c = num(x.ClosingPrice), ch = num(x.Change), val = num(x.TradeValue), prev = c - ch;
+        if(c >= 10 && prev > 0 && val >= 1e8 && /^[1-9][0-9]{3}$/.test(x.Code || ''))
+          list.push({id: x.Code, name: x.Name, c, pct: ch / prev * 100, val});
+      }
+    }catch(e){}
+    try{
+      const arr = await (await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes')).json();
+      for(const x of (arr || [])){
+        const id = x.SecuritiesCompanyCode || x.Code;
+        const c = num(x.Close), ch = num(x.Change), val = num(x.TransactionAmount), prev = c - ch;
+        if(c >= 10 && prev > 0 && val >= 1e8 && /^[1-9][0-9]{3}$/.test(id || ''))
+          list.push({id, name: x.CompanyName || id, c, pct: ch / prev * 100, val});
+      }
+    }catch(e){}
+    const hot = list.filter(x => x.pct >= 5).sort((a, b) => b.pct - a.pct).slice(0, 12);
+    if(hot.length < 3) return;   // 官方資料未更新或全場弱勢,安靜不顯示
+    box.innerHTML = hot.map(h => {
+      const lu = h.pct >= 9.4, label = (h.name || h.id).replace(/[<>'"]/g, '');
+      return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
+        + `<div class="label">${label}<span style="float:right; font-size:.7rem; ${lu ? 'color:var(--red); font-weight:700;' : 'opacity:.7;'}">${lu ? '🔒 漲停' : '強勢'}</span></div>`
+        + `<div class="up" style="font-size:1.4rem; font-weight:800; line-height:1.2;">${fmt(h.c)}</div>`
+        + `<div class="up" style="font-size:.88rem; font-weight:700; margin-top:2px;">▲ ${pct(h.pct)}</div>`
+        + `<div class="sub">成交 ${(h.val / 1e8).toFixed(1)} 億</div></div>`;
+    }).join('');
+    card.style.display = 'block';
+    track('radar', {n: hot.length});
   }catch(e){}
 }
 
