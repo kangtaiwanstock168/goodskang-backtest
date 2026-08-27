@@ -294,7 +294,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260827-N|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260827-O|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2052,6 +2052,7 @@ function taChecklist(s){
        : trend === '轉多' ? `${limitUp ? '漲停' : '帶量'}突破頸線(前波頭 ${fmt(neck)})——轉多確認(頭底雖交錯,但價量已先表態)`
        : trend === '空頭' ? '頭頭低、底底低——空頭結構,順勢原則下不做多'
        : nearNeck ? `${phase === '打底' ? '底底高已成立,' : ''}今天${limitUp ? '漲停' : '帶量'}攻到頸線門口——收 ${fmt(last.close)} vs 前波頭 ${fmt(neck)},只差 ${((neck - last.close) / neck * 100).toFixed(1)}%;收盤站過它才算轉多確認,<b>明天就是關鍵日</b>`
+       : (trend === '盤整' && neckTop > 0 && last.close > neckTop) ? `頭底交錯,但已站上前波頭 ${fmt(neckTop)}(距「突破確立」門檻僅一步)——守住它不破,趨勢翻多在望;跌回其下=假突破,先退`
        : phase === '打底' ? `<b>打底轉強中</b>:底底高已成立(第二隻腳 ${fmt(Ls[1].p)} 高於前底 ${fmt(Ls[0].p)}),但還沒過前波頭 ${fmt(neck)}——非空非多的過渡期;收盤站過 ${fmt(neck)} =多頭確認,跌破 ${fmt(Ls[1].p)} =打底失敗`
        : phase === '作頭' ? `<b>作頭疑慮</b>:頭頭低已出現(${fmt(Hs[1].p)} 低於前頭 ${fmt(Hs[0].p)}),但前底 ${fmt(Ls[1].p)} 未破——跌破它轉空頭,收復 ${fmt(Hs[1].p)} 解除警報`
        : '頭底交錯——盤整,方向未表態'});
@@ -2088,11 +2089,13 @@ function taChecklist(s){
   items.push({icon: bIcon, name: '買點紀律', txt: bTxt});
   const score = items.filter(x => x.icon === '✅').length;
   const lastLowC = LsC.length ? LsC[LsC.length-1].p : Math.min(...c.slice(-20));
-  // 突破確立的多頭:防守參考改用「前高轉支撐」——舊的前波低已經是兩個月前的世界
-  const lastLow = sustained ? neckTop : lastLowC;
-  const stop = sustained
-    ? `多方常用防守位=突破後的前高轉支撐 ${fmt(neckTop)} 與月線 ${fmt(ma20)}——回測不破=突破有效的二次確認;跌破就出場,不攤平`
-    : `多方常用防守位=前波低點 ${fmt(lastLow)} 與月線 ${fmt(ma20)}——順勢規則:跌破買進依據的低點就無條件出場、不攤平、不延後`;
+  // 防守要「近而有效」:只要價格已站上前波頭,防守就升級成前高轉支撐——遠古低點對現價沒有防守意義
+  const lastLow = (neckTop > 0 && last.close > neckTop && neckTop > lastLowC) ? neckTop : lastLowC;
+  const recentLow = Math.min(...s.slice(-6, -1).map(b => b.min));
+  const shortNote = (trend !== '空頭' && recentLow > lastLow * 1.02) ? `;短線想守緊一點,可用近日回檔低點 ${fmt(recentLow)}` : '';
+  const stop = (lastLow === neckTop && neckTop > lastLowC)
+    ? `多方防守=前高轉支撐 ${fmt(neckTop)} 與月線 ${fmt(ma20)}——突破後回測不破=突破有效的二次確認;跌破就出場,不攤平${shortNote}`
+    : `多方常用防守位=前波低點 ${fmt(lastLow)} 與月線 ${fmt(ma20)}——順勢規則:跌破買進依據的低點就無條件出場、不攤平、不延後${shortNote}`;
   const verdict = trend === '空頭'
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="down">不利</b>——順勢原則:當沖也只做日K趨勢的方向,空頭日不硬做多。`
     : score >= 3
