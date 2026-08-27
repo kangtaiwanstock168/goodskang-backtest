@@ -161,6 +161,7 @@
   <div class="card" id="topicCard" style="display:none;">
     <h2 class="section">📰 話題雷達——新聞正在追的股票</h2>
     <p class="subtitle">昨晚到現在,哪些股票被新聞點名最多次?統計主流財經媒體<b style="color:var(--text);">報導則數</b>排序(客觀計數,非推薦)——蘋果發表會、輝達財報這種大事,相關供應鏈會自己浮上來。點卡片直接跑檢查表+回測:</p>
+    <p id="topicThemes" style="display:none; margin:0 0 10px; font-size:.9rem; color:var(--muted); line-height:2.1;"></p>
     <div class="stats" id="topicBox"></div>
     <p class="hint" style="margin-top:8px;" id="topicHint"></p>
   </div>
@@ -314,7 +315,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-I|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-K|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -570,13 +571,13 @@ function updateDcaHint(){
   $('dcaCount').value = 3;
   $('dcaAmount').value = '10,000';
   updateDcaHint();
-  // 進站排序:表單(代號+開始分析)最先 → 話題雷達 → 強勢雷達 → 觀察站;回訪者(有觀察名單)則觀察站優先於雷達
+  // 進站排序:話題雷達(新聞熱股+價格)最先 → 表單(代號+開始分析) → 強勢雷達/觀察站(回訪者觀察站優先)
   try{
     const wb = $('watchBoard'), cont = wb.parentNode;
     const formCard = $('stockId').closest('.card');
-    cont.insertBefore(formCard, wb);   // DOM 原序:觀察站→話題→強勢→表單;表單插到最前
-    if(!loadWatch().length){           // 新客:雷達們排在觀察站前
-      cont.insertBefore($('topicCard'), wb);
+    cont.insertBefore(formCard, wb);            // 表單移到觀察站前
+    cont.insertBefore($('topicCard'), formCard); // 話題雷達壓在最前——進站第一眼就是熱門新聞股+紅綠價格
+    if(!loadWatch().length){                     // 新客:強勢雷達排在觀察站前
       cont.insertBefore($('radarCard'), wb);
     }
   }catch(e){}
@@ -2052,12 +2053,22 @@ async function renderTopic(){
     // 等股名清單載入(最多 3 秒),沒有就顯示代號
     for(let w = 0; w < 10 && !stockList; w++) await new Promise(rs => setTimeout(rs, 300));
     const nameOf = id => { const hit = (stockList || []).find(s2 => s2.id === id); return hit ? hit.name : id; };
-    // 盤中/收盤後帶即時價
+    // 🎯 今日主題:新聞標題的關鍵字聚類——記者已經把供應鏈寫在標題裡,這裡把它讀出來
+    try{
+      const th = (j && j.themes) || [];
+      const tEl = $('topicThemes');
+      if(tEl && th.length){
+        tEl.innerHTML = '🎯 <b style="color:var(--gold);">今日主題</b>:' + th.map(t2 =>
+          `<b style="color:var(--text);">${String(t2.name).replace(/[<>'"]/g, '')}</b> → ` +
+          t2.stocks.map(s3 => { const nm2 = nameOf(s3.id).replace(/[<>'"]/g, '');
+            return `<button type="button" class="chip" style="padding:4px 12px; margin:2px 4px 2px 0;" onclick="quickRun('${s3.id} ${nm2}')">${nm2}</button>`; }).join('')
+        ).join('<span style="opacity:.4;">|</span> ');
+        tEl.style.display = 'block';
+      }
+    }catch(e){}
+    // 帶最新價格(盤中=即時,收盤後/週末=最後收盤)——紅綠一眼看熱鬧在哪
     let lm = {};
-    const nD = new Date(), nM = nD.getHours() * 60 + nD.getMinutes();
-    if(nD.getDay() >= 1 && nD.getDay() <= 5 && nM >= 540){
-      try{ lm = await fetchLiveBatch(top.map(x => x.id)); }catch(e){ lm = {}; }
-    }
+    try{ lm = await fetchLiveBatch(top.map(x => x.id)); }catch(e){ lm = {}; }
     box.innerHTML = top.map(x => {
       const nm = nameOf(x.id).replace(/[<>'"]/g, '');
       const lv = lm[x.id];
@@ -2069,9 +2080,9 @@ async function renderTopic(){
       return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
         + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:var(--gold); font-weight:700;">${x.n} 則報導</span></div>`
         + mid
-        + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}</div></div>`;
+        + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div></div>`;
     }).join('');
-    $('topicHint').textContent = `統計日:${j.day}|已濾除論壇貼文|報導多=市場在看,不代表該買——點進去看五燈檢查表和回測,自己判斷。`;
+    $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——點進去看五燈檢查表和回測,自己判斷。`;
     card.style.display = 'block';
     track('topic', {n: top.length});
   }catch(e){}
