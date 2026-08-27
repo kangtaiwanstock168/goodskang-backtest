@@ -173,6 +173,12 @@
     <p class="hint" style="margin-top:8px;">資料:證交所/櫃買開放資料(盤後更新)。想知道這種噴法「歷史上之後都怎麼演」?點下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
   </div>
 
+  <div class="card" id="topic2Card" style="display:none;">
+    <h2 class="section">📰 更多話題股——完整新聞熱度榜</h2>
+    <div class="stats" id="topic2Box"></div>
+    <p class="hint" id="topic2Hint" style="margin-top:8px;">接續頁面最上方的話題雷達,合計列出新聞熱度前 15 名。</p>
+  </div>
+
   <div class="card">
     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
       <div style="flex:1 1 240px;"><label>股票代號 / 名稱</label><div class="combo"><input type="text" id="stockId" value="2330 台積電" placeholder="例:2330 或 台積電" autocomplete="off"><div id="suggest" class="suggest"></div></div></div>
@@ -315,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-K|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-L|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2069,7 +2075,7 @@ async function renderTopic(){
     // 帶最新價格(盤中=即時,收盤後/週末=最後收盤)——紅綠一眼看熱鬧在哪
     let lm = {};
     try{ lm = await fetchLiveBatch(top.map(x => x.id)); }catch(e){ lm = {}; }
-    box.innerHTML = top.map(x => {
+    const mkCard = x => {
       const nm = nameOf(x.id).replace(/[<>'"]/g, '');
       const lv = lm[x.id];
       const hasP = lv && lv.p > 0 && lv.prev > 0;
@@ -2081,9 +2087,17 @@ async function renderTopic(){
         + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:var(--gold); font-weight:700;">${x.n} 則報導</span></div>`
         + mid
         + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div></div>`;
-    }).join('');
-    $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——點進去看五燈檢查表和回測,自己判斷。`;
+    };
+    // 首屏開胃菜:電腦 5 張、手機 6 張——別把輸入框推出視野;其餘的放「更多話題股」補到 15
+    const topN = window.innerWidth <= 640 ? 6 : 5;
+    box.innerHTML = top.slice(0, topN).map(mkCard).join('');
+    $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——完整前 15 名在下方「更多話題股」。`;
     card.style.display = 'block';
+    const rest = top.slice(topN);
+    if(rest.length && $('topic2Box')){
+      $('topic2Box').innerHTML = rest.map(mkCard).join('');
+      $('topic2Card').style.display = 'block';
+    }
     track('topic', {n: top.length});
   }catch(e){}
 }
