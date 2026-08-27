@@ -71,7 +71,7 @@ exports.handler = async () => {
     const last = x.list[x.list.length - 1];
     return {id: x.id, n: x.list.length, m: x.mkt,
       t: last ? last.t.slice(0, 40) : '(今日僅權證/行銷稿)', link: last ? last.link : ''};
-  }).sort((a, b) => (b.n - a.n) || (b.m - a.m)).slice(0, 9);
+  }).sort((a, b) => (b.n - a.n) || (b.m - a.m)).slice(0, 15);
   return {
     statusCode: 200,
     headers: {'content-type': 'application/json', 'cache-control': 'public, max-age=1800'},
