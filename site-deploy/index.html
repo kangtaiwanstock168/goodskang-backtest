@@ -301,7 +301,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-D|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2034,7 +2034,7 @@ $('shareBtn').onclick = doShare;
 
 // 📐 順勢技術檢查表:趨勢(頭與底)、均線架構、量價、回後買上漲——經典順勢規則的自動比對
 // 只描述技術現狀與規則符合度,不輸出任何「建議買賣」字眼(無照投顧是刑責紅線)
-function taChecklist(s){
+function taChecklist(s, instNet){
   const n = s.length; if(n < 65) return null;
   const c = s.map(d => d.close);
   const ma = (k, idx) => { let t = 0; for(let j = idx-k+1; j <= idx; j++) t += c[j]; return t / k; };
@@ -2132,6 +2132,17 @@ function taChecklist(s){
   if(last.close >= hi20 * 0.97 && volX >= 2 && upSh > body){ vIcon = '❌'; vTxt += ';且高檔爆量收長上影——出貨警訊'; }
   if(last.live) vTxt += '(今日盤中,量為全日推估)';
   items.push({icon: vIcon, name: '量價', txt: vTxt});
+  // ⑤ 法人籌碼:外資+投信近 5 日合計——漲勢有沒有法人真金白銀,決定續航力;法人賣、行情漲=別人在拉,隔日沖劇本警戒
+  if(instNet != null){
+    const lots = Math.round(instNet / 1000);
+    const v5sum = vols.slice(-5).reduce((a, b) => a + b, 0);
+    const ratio = v5sum > 0 ? Math.abs(instNet) / v5sum * 100 : 0;
+    let iIcon, iTxt;
+    if(instNet > 0 && ratio >= 2){ iIcon = '✅'; iTxt = `外資+投信近 5 日合計<b class="up">買超 ${lots.toLocaleString('zh-TW')} 張</b>(佔 5 日量 ${ratio.toFixed(1)}%)——法人真金白銀進駐,行情有大人撐腰`; }
+    else if(instNet < 0 && ratio >= 2){ iIcon = '❌'; iTxt = `外資+投信近 5 日合計<b class="down">賣超 ${Math.abs(lots).toLocaleString('zh-TW')} 張</b>(佔 5 日量 ${ratio.toFixed(1)}%)——${upDay ? '法人在出、行情在漲=拉抬另有其人,留意隔日沖/出貨劇本' : '法人持續調節,反彈先當反彈看'}`; }
+    else { iIcon = '⚠️'; iTxt = `外資+投信近 5 日約略中性(${lots >= 0 ? '+' : ''}${lots.toLocaleString('zh-TW')} 張)——法人觀望,行情由內資與散戶推動,續航力要打個問號`; }
+    items.push({icon: iIcon, name: '法人籌碼', txt: iTxt});
+  }
   // ④ 買點紀律:回後買上漲,不追突破長紅
   const nearMA = Math.min(...s.slice(-5).map(d => d.min)) <= ma20 * 1.015;
   const redUp = last.close > last.open && upDay;
@@ -2144,25 +2155,42 @@ function taChecklist(s){
   items.push({icon: bIcon, name: '買點紀律', txt: bTxt});
   const score = items.filter(x => x.icon === '✅').length;
   const lastLowC = LsC.length ? LsC[LsC.length-1].p : Math.min(...c.slice(-20));
-  // 防守要「近而有效」:只要價格已站上前波頭,防守就升級成前高轉支撐——遠古低點對現價沒有防守意義
-  const lastLow = (neckTop > 0 && last.close > neckTop && neckTop > lastLowC) ? neckTop : lastLowC;
+  // 防守要「近而有效」:站上前波頭→前高轉支撐;多頭延伸段→再升級成「移動防守」
+  let lastLow = (neckTop > 0 && last.close > neckTop && neckTop > lastLowC) ? neckTop : lastLowC;
+  // 移動防守(手冊規則:獲利後用「前一個底」或月線移動停利)——找最近一個 ±2 根的小回檔低點
+  let trailLow = 0;
+  for(let k = n - 3; k >= Math.max(2, n - 16); k--){
+    const lo0 = s[k].min;
+    if(lo0 <= s[k-1].min && lo0 <= s[k-2].min && lo0 <= s[k+1].min && (k + 2 >= n || lo0 <= s[k+2].min)){ trailLow = lo0; break; }
+  }
+  let trailing = false;
+  if(trend === '多頭'){
+    const cand = [trailLow, ma20, lastLow].filter(v => v > 0 && v < last.close);
+    if(cand.length){ const up2 = Math.max(...cand); if(up2 > lastLow){ lastLow = up2; trailing = true; } }
+  }
   const recentLow = Math.min(...s.slice(-6, -1).map(b => b.min));
   const shortNote = (trend !== '空頭' && recentLow > lastLow * 1.02) ? `;短線想守緊一點,可用近日回檔低點 ${fmt(recentLow)}` : '';
-  const stop = (lastLow === neckTop && neckTop > lastLowC)
+  const stop = trailing
+    ? `多頭移動防守=前一個回檔底/月線之較高者 ${fmt(lastLow)}(月線 ${fmt(ma20)})——趨勢延伸,防守跟著墊高;跌破就出場或大減碼,停利可以提早、停損不能商量${shortNote}`
+    : (lastLow === neckTop && neckTop > lastLowC)
     ? `多方防守=前高轉支撐 ${fmt(neckTop)} 與月線 ${fmt(ma20)}——突破後回測不破=突破有效的二次確認;跌破就出場,不攤平${shortNote}`
     : `多方常用防守位=前波低點 ${fmt(lastLow)} 與月線 ${fmt(ma20)}——順勢規則:跌破買進依據的低點就無條件出場、不攤平、不延後${shortNote}`;
+  const nItems = items.length, thF = nItems - 1, thL = nItems - 2;   // 友善=只差一燈,偏多=差兩燈(相容 4 燈與 5 燈版)
+  const instBad = instNet != null && instNet < 0;
   const verdict = trend === '空頭'
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="down">不利</b>——順勢原則:當沖也只做日K趨勢的方向,空頭日不硬做多。`
-    : score >= 3
-    ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="up">相對友善</b>(${score}/4 綠燈)——但短線成敗在盤中紀律,環境好不等於會賺。`
-    : (trend === '多頭' && score >= 2)
-    ? `🚦 綜合:<b class="up">順勢偏多</b>(${score}/4 綠燈)——日K趨勢向上,但短線條件未齊(乖離或量能)——與其追高,不如等拉回支撐(${fmt(lastLow)} / 月線 ${fmt(ma20)})再接,順勢不追勢。`
+    : score >= thF
+    ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="up">相對友善</b>(${score}/${nItems} 綠燈)——但短線成敗在盤中紀律,環境好不等於會賺。`
+    : (trend === '多頭' && score >= thL)
+    ? `🚦 綜合:<b class="up">順勢偏多</b>(${score}/${nItems} 綠燈)——日K趨勢向上,但短線條件未齊——與其追高,不如等拉回支撐(${fmt(lastLow)} / 月線 ${fmt(ma20)})再接,順勢不追勢。`
     : (phase === '打底' && (score >= 1 || nearNeck))
-    ? `🚦 綜合:日K處於<b style="color:var(--gold);">打底轉強醞釀期</b>(${score}/4 綠燈)——還不到全面做多,但已不是死盤。短線只宜輕倉試單,鎖住兩個價位:收盤站過頸線 <b>${fmt(neck)}</b> 環境升級,跌破 <b>${fmt(lastLow)}</b> 無條件走人。`
+    ? (limitUp
+      ? `🚦 綜合:<b style="color:var(--gold);">打底期爆出漲停</b>(${score}/${nItems} 綠燈)——第二隻腳之後的攻擊發起樣態,頸線 <b>${fmt(neck)}</b> 就在前方:收盤站過=多頭確認${instBad ? ';但法人近 5 日在賣方,今天的漲停是內資拉的——<b>隔日沖賣壓警戒</b>,隔天開盤別接第一棒' : ',隔天留意能否守住漲停價不破'}。防守 <b>${fmt(lastLow)}</b>。`
+      : `🚦 綜合:日K處於<b style="color:var(--gold);">打底轉強醞釀期</b>(${score}/${nItems} 綠燈)——還不到全面做多,但已不是死盤。短線只宜輕倉試單,鎖住兩個價位:收盤站過頸線 <b>${fmt(neck)}</b> 環境升級,跌破 <b>${fmt(lastLow)}</b> 無條件走人。`)
     : phase === '作頭'
-    ? `🚦 綜合:日K出現<b class="down">作頭疑慮</b>(${score}/4 綠燈)——反彈不追,短線做多先縮手;跌破 <b>${fmt(lastLow)}</b> 轉空確認。`
-    : `🚦 綜合:日K環境<b style="color:var(--gold);">中性</b>(${score}/4 綠燈)——訊號不齊,短線寧可少做,等綠燈變多。`;
-  return {items, score, stop, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n};
+    ? `🚦 綜合:日K出現<b class="down">作頭疑慮</b>(${score}/${nItems} 綠燈)——反彈不追,短線做多先縮手;跌破 <b>${fmt(lastLow)}</b> 轉空確認。`
+    : `🚦 綜合:日K環境<b style="color:var(--gold);">中性</b>(${score}/${nItems} 綠燈)——訊號不齊,短線寧可少做,等綠燈變多。`;
+  return {items, score, nItems, stop, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n};
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
@@ -2288,10 +2316,24 @@ async function renderAiInsight(stockId, name){
     const stL = new Date(now); stL.setDate(stL.getDate() - 160);   // 個股多抓:順勢檢查表需要 60MA 與頭底轉折
     const startL = `${stL.getFullYear()}-${p2(stL.getMonth()+1)}-${p2(stL.getDate())}`;
     const clean = arr => (arr || []).filter(d => d.open > 0 && d.max > 0 && d.min > 0 && d.close > 0).sort((a,b) => a.date.localeCompare(b.date));
-    const [sRaw, bRaw] = await Promise.all([
+    const [sRaw, bRaw, instRaw] = await Promise.all([
       fetchPrices(stockId, startL, end).catch(() => []),
-      stockId === '0050' ? Promise.resolve([]) : fetchPrices('0050', start, end).catch(() => [])
+      stockId === '0050' ? Promise.resolve([]) : fetchPrices('0050', start, end).catch(() => []),
+      fmData(`dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stockId}&start_date=${start}&end_date=${end}`).then(j => j.data || []).catch(() => null)
     ]);
+    // 外資+投信近 5 個交易日合計買賣超(股)——給檢查表第五項「法人籌碼」
+    let instNet = null;
+    try{
+      if(Array.isArray(instRaw)){
+        const byDate = {};
+        for(const r of instRaw){
+          if(r.name === 'Foreign_Investor' || r.name === 'Investment_Trust')
+            byDate[r.date] = (byDate[r.date] || 0) + ((r.buy || 0) - (r.sell || 0));
+        }
+        const ds = Object.keys(byDate).sort().slice(-5);
+        if(ds.length >= 3) instNet = ds.reduce((a, d) => a + byDate[d], 0);
+      }
+    }catch(e){}
     let s = clean(sRaw), b = clean(bRaw);
     // 收盤後即時補今日 K 棒(FinMind 通常隔天才更新)
     try{ if(s.length){ const tb = await fetchTodayBar(stockId, s[s.length-1].date, end); if(tb) s.push(tb); } }catch(e){}
@@ -2454,7 +2496,7 @@ async function renderAiInsight(stockId, name){
 
     // ═══ 三層資訊架構:①膠囊速讀(3 秒) ②標註 K 線圖(視覺) ③展開層(白話解讀+順勢檢查表) ═══
     let ckObj = null;
-    try{ ckObj = taChecklist(s); }catch(e){}
+    try{ ckObj = taChecklist(s, instNet); }catch(e){}
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
     if(relDiff != null) pills += `<span class="pill">對大盤 ${Math.abs(relDiff) < 1
@@ -2484,7 +2526,7 @@ async function renderAiInsight(stockId, name){
       const bad = ckObj.verdict.includes('不利') || ckObj.verdict.includes('作頭'), good = ckObj.verdict.includes('友善');
       const bc = bad ? 'var(--green)' : good ? 'var(--red)' : 'var(--gold)';
       const bg = bad ? 'rgba(63,185,80,.08)' : good ? 'rgba(248,81,73,.08)' : 'rgba(210,153,34,.08)';
-      ckBoxHtml = `<div style="${subBox}"><p style="font-weight:700; margin:0 0 8px; color:var(--gold);">📐 順勢技術檢查表(${ckObj.score}/4 綠燈)</p>`
+      ckBoxHtml = `<div style="${subBox}"><p style="font-weight:700; margin:0 0 8px; color:var(--gold);">📐 順勢技術檢查表(${ckObj.score}/${ckObj.nItems} 綠燈)</p>`
         + `<p style="margin:0 0 10px; padding:9px 12px; border-radius:8px; font-weight:700; border:1px solid ${bc}; background:${bg}; line-height:1.7;">${ckObj.verdict}</p>`
         + ckObj.items.map(x => `<p style="margin:6px 0; line-height:1.7; font-size:.95rem;">${x.icon} <b>${x.name}:</b>${x.txt}</p>`).join('')
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🛡 <b>防守參考:</b>${ckObj.stop}</p>`
