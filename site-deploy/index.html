@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-N|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-O|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2134,7 +2134,7 @@ function taChecklist(s, instNet){
   // 小於門檻的三兩天小抖動不算頭腳——朱家泓畫的頭與底是「波段」,不是雜訊
   let ampSum = 0;
   for(let k = n - 20; k < n; k++) ampSum += (s[k].max - s[k].min) / c[k - 1];
-  const TH = Math.min(0.09, Math.max(0.03, (ampSum / 20) * 1.8));
+  const TH = Math.min(0.065, Math.max(0.025, (ampSum / 20) * 1.2));   // 高波動股門檻壓在 6.5% 內,否則整段打底結構會被當雜訊抹掉
   const pv = [];
   let pend = null;   // 進行中的未完成波:漲/跌了一段但尚未反轉確認——不計入它,引擎會拿兩個月前的舊頭腳看今天
   {
@@ -2287,6 +2287,8 @@ function taChecklist(s, instNet){
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="down">不利</b>——順勢原則:當沖也只做日K趨勢的方向,空頭日不硬做多。`
     : score >= thF
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="up">相對友善</b>(${score}/${nItems} 綠燈)——但短線成敗在盤中紀律,環境好不等於會賺。`
+    : (trend === '多頭' && bIcon === '✅')
+    ? `🚦 綜合:<b class="up">順勢買點浮現</b>(${score}/${nItems} 綠燈)——「回後買上漲」樣態成立,這是順勢框架裡位階最高的進場訊號;但配套燈號未滿(留意季線壓力或法人動向),倉位打折、防守 <b>${fmt(lastLow)}</b> 嚴格執行,跌破不戀戰。`
     : (trend === '多頭' && score >= thL)
     ? `🚦 綜合:<b class="up">順勢偏多</b>(${score}/${nItems} 綠燈)——日K趨勢向上,但短線條件未齊——與其追高,不如等拉回支撐(${fmt(lastLow)} / 月線 ${fmt(ma20)})再接,順勢不追勢。`
     : (phase === '打底' && (score >= 1 || nearNeck))
@@ -2616,6 +2618,7 @@ async function renderAiInsight(stockId, name){
     if(ckObj){
       const light = ckObj.verdict.includes('不利') ? '<b class="down">不利 🔴</b>'
         : ckObj.verdict.includes('友善') ? '<b class="up">友善 🟢</b>'
+        : ckObj.verdict.includes('買點浮現') ? '<b class="up">買點浮現 🟢</b>'
         : ckObj.verdict.includes('爆出漲停') ? '<b class="up">攻擊發起 🟠</b>'
         : ckObj.verdict.includes('醞釀') ? '<b style="color:var(--gold);">醞釀 🟡</b>'
         : ckObj.verdict.includes('作頭') ? '<b class="down">警戒 🟠</b>'
