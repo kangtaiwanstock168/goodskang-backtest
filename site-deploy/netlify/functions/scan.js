@@ -20,7 +20,7 @@ exports.handler = async () => {
         list.push({id, name: x.CompanyName || id, c, pct: +(ch / prev * 100).toFixed(2), val: Math.round(val)});
     }
   }catch(e){}
-  // 組成:人氣王 3 檔(成交值最大、漲幅 ≥2%,鴻海台積電這類全民股)+ 強勢股 9 檔(漲幅排序)
+  // 組成:人氣王 3 檔(成交值最大、漲幅 ≥2%,聯電台積電這類全民股)+ 強勢股 9 檔(漲幅排序)
   const hot = list.filter(x => x.pct >= 5).sort((a, b) => b.pct - a.pct).slice(0, 9);
   const used = new Set(hot.map(x => x.id));
   const kings = list.filter(x => x.pct >= 2 && !used.has(x.id)).sort((a, b) => b.val - a.val).slice(0, 3).map(x => Object.assign({}, x, {k: 1}));
