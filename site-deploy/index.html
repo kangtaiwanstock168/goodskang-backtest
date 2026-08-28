@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-L|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-M|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2218,7 +2218,9 @@ function taChecklist(s, instNet){
   else if(upDay && volX >= 1.3){ vIcon = '✅'; vTxt = `上漲帶量(${volX.toFixed(1)}× 五日均量)——健康`; }
   else if(!upDay && volX < 1){ vIcon = '✅'; vTxt = `回檔量縮(${volX.toFixed(1)}×)——賣壓不重,健康`; }
   else if(!upDay && volX >= 1.3){ vIcon = '❌'; vTxt = `價跌量增(${volX.toFixed(1)}×)——真實賣壓`; }
-  else { vIcon = '⚠️'; vTxt = upDay ? `價漲量縮(${volX.toFixed(1)}×)——追價意願不足` : `量能平平(${volX.toFixed(1)}×)`; }
+  else if(upDay && volX < 0.9){ vIcon = '⚠️'; vTxt = `價漲量縮(${volX.toFixed(1)}× 五日均量)——追價意願不足,這種漲要打點折看`; }
+  else if(upDay){ vIcon = '⚠️'; vTxt = `價漲量平(${volX.toFixed(1)}× 五日均量)——量能中性,放大到 1.3 倍以上才算買盤表態`; }
+  else { vIcon = '⚠️'; vTxt = `量能平平(${volX.toFixed(1)}× 五日均量)`; }
   const hi20 = Math.max(...c.slice(-20));
   const body = Math.abs(last.close - last.open), upSh = last.max - Math.max(last.close, last.open);
   if(last.close >= hi20 * 0.97 && volX >= 2 && upSh > body){ vIcon = '❌'; vTxt += ';且高檔爆量收長上影——出貨警訊'; }
