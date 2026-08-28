@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-P|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-Q|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2001,12 +2001,15 @@ async function renderRadar(){
   const card = $('radarCard'), box = $('radarBox');
   try{
     const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g, '')); return isFinite(n) ? n : 0; };
-    // 首選:自家函式伺服器端掃描(免 CORS、全站共用快取);失敗才退回瀏覽器直連
+    // 首選:自家函式伺服器端掃描(免 CORS、全站共用快取);冷啟動失敗等 2.5 秒重試一次,別讓整區消失
     let hot = [];
-    try{
-      const r = await fetch('/.netlify/functions/scan');
-      if(r.ok){ const j = await r.json(); if(Array.isArray(j)) hot = j; }
-    }catch(e){}
+    for(let att = 0; att < 2 && hot.length < 3; att++){
+      if(att) await new Promise(rs => setTimeout(rs, 2500));
+      try{
+        const r = await fetch('/.netlify/functions/scan');
+        if(r.ok){ const j = await r.json(); if(Array.isArray(j)) hot = j; }
+      }catch(e){}
+    }
     if(hot.length < 3){
       const list = [];
       try{
@@ -2051,9 +2054,14 @@ async function renderRadar(){
 async function renderTopic(){
   const card = $('topicCard'), box = $('topicBox');
   try{
-    const r = await fetch('/.netlify/functions/news');
-    if(!r.ok) return;
-    const j = await r.json();
+    let j = null;
+    for(let att = 0; att < 2 && !(j && (j.top || []).length >= 3); att++){
+      if(att) await new Promise(rs => setTimeout(rs, 3000));
+      try{
+        const r = await fetch('/.netlify/functions/news');
+        if(r.ok) j = await r.json();
+      }catch(e){}
+    }
     const top = (j && j.top) || [];
     if(top.length < 3) return;
     // 等股名清單載入(最多 3 秒),沒有就顯示代號
