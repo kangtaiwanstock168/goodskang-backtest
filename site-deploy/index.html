@@ -170,7 +170,7 @@
     <h2 class="section">⚡ 盤後強勢股雷達——今天市場最有戲的股票</h2>
     <p class="subtitle">官方最新收盤全市場掃描:<b style="color:var(--accent);">🔥 人氣王</b>(成交值最大的上漲權值股)+<b style="color:var(--red);">強勢股</b>(漲幅 ≥5%、成交值 ≥1 億)——<b style="color:var(--text);">點任一檔直接跑完整檢查表與回測</b>。僅為客觀數據排序,非選股建議。</p>
     <div class="stats" id="radarBox"></div>
-    <p class="hint" style="margin-top:8px;">⏰ 資料:證交所/櫃買開放資料——<b style="color:var(--gold);">官方約 17:00 後才發布當日收盤,傍晚五點前看到的是前一交易日</b>;想看「今天」盤中誰在噴,參考上方話題雷達的即時價。點卡片下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
+    <p class="hint" style="margin-top:8px;" id="radarHint">⏰ 上市:證交所盤後行情(約 14:00 更新);上櫃:櫃買開放資料(更新較晚,可能落後半天)。想看盤中誰在噴,參考上方話題雷達的即時價。點卡片下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
   </div>
 
   <div class="card" id="topic2Card" style="display:none;">
@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260828-R|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260828-S|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -2007,7 +2007,11 @@ async function renderRadar(){
       if(att) await new Promise(rs => setTimeout(rs, 2500));
       try{
         const r = await fetch('/.netlify/functions/scan');
-        if(r.ok){ const j = await r.json(); if(Array.isArray(j)) hot = j; }
+        if(r.ok){
+          const j = await r.json();
+          if(Array.isArray(j)) hot = j;                                  // 舊版回傳格式
+          else if(j && Array.isArray(j.list)){ hot = j.list; if(j.d) window.SCAN_DATE = j.d; }   // v3:附資料日
+        }
       }catch(e){}
     }
     if(hot.length < 3){
@@ -2045,6 +2049,7 @@ async function renderRadar(){
         + `<div class="up" style="font-size:.88rem; font-weight:700; margin-top:2px;">▲ ${pct(h.pct)}</div>`
         + `<div class="sub">成交 ${(h.val / 1e8).toFixed(1)} 億</div></div>`;
     }).join('');
+    if(window.SCAN_DATE) $('radarHint').innerHTML = `⏰ <b style="color:var(--gold);">上市資料日:${window.SCAN_DATE}</b>|` + $('radarHint').innerHTML;
     card.style.display = 'block';
     track('radar', {n: hot.length});
   }catch(e){}
