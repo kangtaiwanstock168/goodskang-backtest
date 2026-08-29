@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260830-C|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260830-D|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -343,7 +343,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260830-C';
+const APP_VER = 'v20260830-D';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1280,7 +1280,7 @@ function renderMonthly(s1, r, lump, fullPush){
 }
 
 // 投入明細:各策略對照 + 綜合結語
-function renderBuyTables(data, monthly, pull, swing3, swing4, swing5, combo, lumpHold){
+function renderBuyTables(data, monthly, pull, swing3, swing4, swing5, combo, lumpHold, isEtf){
   $('buyTableSub').textContent = '累計報酬率以各交易日收盤價估算(未含賣出成本);日期後為星期,每月 5 日遇假日已順延至下一個開盤日';
   const last = data[data.length-1];
   const pnl = n => `<td class="${cls(n)}">${(n>=0?'+':'')+money(n)}</td>`;
@@ -1443,7 +1443,10 @@ function renderBuyTables(data, monthly, pull, swing3, swing4, swing5, combo, lum
                : days >= 250 ? {t:'中', c:'var(--gold)', d:'約 1 年,涵蓋一輪多空,建議再換兩組日期驗證'}
                : days >= 120 ? {t:'低', c:'var(--gold)', d:'不到一年,單一行情主導,冠軍有明顯運氣成分'}
                : {t:'很低', c:'var(--green)', d:'僅一季,樣本太少,冠軍幾乎等於「這段剛好順它」'};
-  const credNote = `<span style="display:inline-block; margin-bottom:10px; padding:8px 12px; border-radius:8px; border:1px solid ${credLv.c}; font-size:.9rem;">🔬 <b>本次結果可信度:<span style="color:${credLv.c};">${credLv.t}</span></b>(區間 ${days} 個交易日)——${credLv.d}。以下是<b>此區間的事後最佳解,不是推薦標的或推薦策略</b>。</span><br>`;
+  // ETF 才提示可信度分級:ETF 是長期持有工具,區間長度直接影響結論外推性;個股每年題材不同,不適用同一把尺
+  const credNote = isEtf
+    ? `<span style="display:inline-block; margin-bottom:10px; padding:8px 12px; border-radius:8px; border:1px solid ${credLv.c}; font-size:.9rem;">🔬 <b>ETF 結果可信度:<span style="color:${credLv.c};">${credLv.t}</span></b>(區間 ${days} 個交易日)——${credLv.d}。ETF 是長期工具,<b>建議至少回測 1 年以上再下結論</b>。</span><br>`
+    : '';
   const summaryCore = credNote + `${CN[stratCount]}種策略在此波段的成績:<br>
     <b>依總損益排名(實際賺賠金額)</b><br>${rankProf}${lazyLine}<br><br>
     <b>依報酬率排名(資金運用效率)</b><br>${rank}${holdLine}<br><br>
@@ -2086,9 +2089,10 @@ async function renderRadar(){
 async function renderTopic(){
   const card = $('topicCard'), box = $('topicBox');
   try{
+    // 話題雷達是全站最重要的入口:函式冷啟動/逾時就重試三次(遞增等待),絕不讓它整區消失
     let j = null;
-    for(let att = 0; att < 2 && !(j && (j.top || []).length >= 3); att++){
-      if(att) await new Promise(rs => setTimeout(rs, 3000));
+    for(let att = 0; att < 3 && !(j && (j.top || []).length >= 3); att++){
+      if(att) await new Promise(rs => setTimeout(rs, att * 3500));
       try{
         const r = await fetch('/.netlify/functions/news');
         if(r.ok) j = await r.json();
@@ -2917,7 +2921,7 @@ async function run(auto){
     }
     renderBuyTables(data, s1,
       pullRes ? pullRes.retWin : null,
-      swing3Best, swing4Best, swing5Best, comboBest, lumpHold);
+      swing3Best, swing4Best, swing5Best, comboBest, lumpHold, /^00/.test(stockId));
 
     // 匿名統計:記錄這次回測的代號與設定(僅你在 GA4 後台可見)
     track('backtest', {
