@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260830-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260830-C|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -343,7 +343,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260830-B';
+const APP_VER = 'v20260830-C';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -432,19 +432,27 @@ async function loadStockList(){
 }
 
 // 通用的股票搜尋下拉:主要股票與比較股票共用
+// 手機版:下拉清單是絕對定位,會蓋住下方的「開始分析」按鈕(P0)——開啟時把按鈕推到清單下面
+function syncSuggestSpace(box){
+  const btnWrap = $('runBtnTop') && $('runBtnTop').parentElement;
+  if(!btnWrap) return;
+  const open = box.style.display === 'block' && window.innerWidth <= 640 && box.id === 'suggest';
+  btnWrap.style.marginTop = open ? (Math.min(box.scrollHeight || 220, 240) + 12) + 'px' : '';
+}
+
 function attachCombo(inp, box, runOnEnter){
   const show = items => {
-    if(items === 'loading'){ box.innerHTML = '<div class="empty">載入股票清單中…</div>'; box.style.display='block'; return; }
-    if(!items.length){ box.innerHTML = '<div class="empty">查無符合的股票</div>'; box.style.display='block'; return; }
+    if(items === 'loading'){ box.innerHTML = '<div class="empty">載入股票清單中…</div>'; box.style.display='block'; syncSuggestSpace(box); return; }
+    if(!items.length){ box.innerHTML = '<div class="empty">查無符合的股票</div>'; box.style.display='block'; syncSuggestSpace(box); return; }
     box.innerHTML = items.map(s => `<div data-id="${s.id}" data-name="${s.name}"><b>${s.id}</b><span>${s.name}</span></div>`).join('');
-    box.style.display = 'block';
+    box.style.display = 'block'; syncSuggestSpace(box);
   };
   async function onInput(){
     const q = inp.value.trim().toUpperCase();
-    if(!q){ box.style.display='none'; return; }
+    if(!q){ box.style.display='none'; syncSuggestSpace(box); return; }
     if(!stockList){ show('loading'); await loadStockList(); }
     const q2 = inp.value.trim().toUpperCase();
-    if(!q2){ box.style.display='none'; return; }
+    if(!q2){ box.style.display='none'; syncSuggestSpace(box); return; }
     const pre = [], mid = [];
     for(const s of stockList){
       if(s.id.startsWith(q2)) pre.push(s);
@@ -456,7 +464,7 @@ function attachCombo(inp, box, runOnEnter){
   inp.addEventListener('focus', onInput);
   box.addEventListener('mousedown', e => {
     const t = e.target.closest('div[data-id]');
-    if(t){ inp.value = t.dataset.id + ' ' + t.dataset.name; box.style.display='none'; }
+    if(t){ inp.value = t.dataset.id + ' ' + t.dataset.name; box.style.display='none'; syncSuggestSpace(box); }
   });
   inp.addEventListener('keydown', e => {
     if(e.key !== 'Enter') return;
@@ -473,7 +481,7 @@ function attachCombo(inp, box, runOnEnter){
 attachCombo($('stockId'), $('suggest'), true);
 attachCombo($('cmpId'), $('suggest2'), false);
 document.addEventListener('click', e => {
-  if(!e.target.closest('.combo')) document.querySelectorAll('.suggest').forEach(b => b.style.display='none');
+  if(!e.target.closest('.combo')) document.querySelectorAll('.suggest').forEach(b => { b.style.display='none'; syncSuggestSpace(b); });
 });
 loadStockList();  // 頁面載入就先抓,輸入時零延遲
 
@@ -1430,7 +1438,13 @@ function renderBuyTables(data, monthly, pull, swing3, swing4, swing5, combo, lum
     1️⃣ 這筆錢打算放多久?想放一年以上、不想盯盤 → 定期定額或抱到底就好;只做幾個月的波段 → 才需要考慮停利與狙擊。<br>
     2️⃣ 此波段最大回檔 <b class="down">-${(monthly.dd || 0).toFixed(2)}%</b>——帳面跌這麼深的時候,你抱得住嗎?抱不住,就用分批投入與預留現金降低痛感,讓自己睡得著比賺得快更重要。`;
 
-  const summaryCore = `${CN[stratCount]}種策略在此波段的成績:<br>
+  // 🔬 可信度分級:區間長度決定「這次冠軍」能不能外推——避免散戶把單一區間最佳化當成推薦
+  const credLv = days >= 500 ? {t:'中高', c:'var(--red)', d:'約 2 年以上,涵蓋多種行情,結論較能外推'}
+               : days >= 250 ? {t:'中', c:'var(--gold)', d:'約 1 年,涵蓋一輪多空,建議再換兩組日期驗證'}
+               : days >= 120 ? {t:'低', c:'var(--gold)', d:'不到一年,單一行情主導,冠軍有明顯運氣成分'}
+               : {t:'很低', c:'var(--green)', d:'僅一季,樣本太少,冠軍幾乎等於「這段剛好順它」'};
+  const credNote = `<span style="display:inline-block; margin-bottom:10px; padding:8px 12px; border-radius:8px; border:1px solid ${credLv.c}; font-size:.9rem;">🔬 <b>本次結果可信度:<span style="color:${credLv.c};">${credLv.t}</span></b>(區間 ${days} 個交易日)——${credLv.d}。以下是<b>此區間的事後最佳解,不是推薦標的或推薦策略</b>。</span><br>`;
+  const summaryCore = credNote + `${CN[stratCount]}種策略在此波段的成績:<br>
     <b>依總損益排名(實際賺賠金額)</b><br>${rankProf}${lazyLine}<br><br>
     <b>依報酬率排名(資金運用效率)</b><br>${rank}${holdLine}<br><br>
     ${pick}<br><br>
@@ -2930,6 +2944,24 @@ async function run(auto){
     lastRunInfo = {id: stockId, name: name || '', b: data[0].date, e: data[data.length-1].date, qs: shareQ.toString()};
     if(!isAuto) try{ history.replaceState(null, '', location.pathname + '?' + lastRunInfo.qs); }catch(e){}
     $('results').style.display='block';
+    // 📚 六種策略與投入明細預設收合:結果頁曾長達 19,000px,重點被稀釋——想深入的人自己點開
+    try{
+      if(!$('deepWrap')){
+        const cards = Array.from($('results').querySelectorAll(':scope > .card'));
+        const deep = cards.filter(c => /策略[一二三四五六]|投入明細/.test((c.querySelector('h2') || {}).textContent || ''));
+        if(deep.length){
+          const d = document.createElement('details');
+          d.id = 'deepWrap';
+          d.style.cssText = 'margin-bottom:20px;';
+          const sm = document.createElement('summary');
+          sm.style.cssText = 'cursor:pointer; padding:14px 18px; background:var(--card); border:1px solid var(--border); border-radius:12px; font-weight:700; color:var(--accent); font-size:1rem;';
+          sm.innerHTML = '📚 查看完整回測——六種策略比較、定期定額 vs 單筆、投入明細(點開)';
+          d.appendChild(sm);
+          deep[0].parentNode.insertBefore(d, deep[0]);
+          deep.forEach(c => d.appendChild(c));
+        }
+      }
+    }catch(e){}
     renderAiInsight(stockId, name);   // AI 近況解析:背景載入,不卡主結果
     // 🍟 輕量轉換:第 3 次「手動」回測後才溫柔提示追蹤——用滿三次代表真的有幫上忙,此時開口最不討人厭(一輩子只出現一次)
     if(!isAuto) try{
