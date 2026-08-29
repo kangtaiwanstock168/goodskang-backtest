@@ -321,7 +321,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260830-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260830-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -343,7 +343,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260830-A';
+const APP_VER = 'v20260830-B';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1945,11 +1945,23 @@ async function refreshWatchBoard(){
         const arrow = r.d1 > 0 ? '▲' : r.d1 < 0 ? '▼' : '—';
         const clickable = r.w.id !== 'TAIEX';
         const sinceTxt = r.since != null ? `|上次來後 <b class="${cls(r.since)}">${pct(r.since)}</b>` : '';
+        // 🗂 訊號戰績:工具上次對這檔說了什麼、之後漲跌多少、防守位守住沒
+        let sigTxt = '';
+        try{
+          const sg = (JSON.parse(localStorage.getItem('sigLog') || '{}'))[r.w.id];
+          if(sg && sg.p > 0 && sg.d !== todayStr){
+            const ch = (r.price - sg.p) / sg.p * 100;
+            const guard = sg.s > 0 ? (r.price >= sg.s ? '<span class="up">防守守住 ✓</span>' : '<span class="down">跌破防守 ✗</span>') : '';
+            const col = sg.t === '友善' || sg.t === '買點浮現' || sg.t === '攻擊發起' ? 'var(--red)' : sg.t === '不利' || sg.t === '警戒' ? 'var(--green)' : 'var(--gold)';
+            sigTxt = `<div style="margin-top:5px; padding-top:5px; border-top:1px dashed var(--border); font-size:.72rem; line-height:1.5;">`
+              + `${sg.d.slice(5).replace('-','/')} 判「<b style="color:${col};">${sg.t}</b>」→ 至今 <b class="${cls(ch)}">${pct(ch)}</b>${guard ? '|' + guard : ''}</div>`;
+          }
+        }catch(e){}
         return `<div class="stat"${clickable ? ` style="cursor:pointer;" onclick="quickRun('${r.w.id} ${label}')"` : ' style="border-color:var(--accent);"'}>`
           + `<div class="label">${label}<span style="float:right; font-size:.7rem;">${r.tag}</span></div>`
           + `<div class="${cls(r.d1)}" style="font-size:1.65rem; font-weight:800; line-height:1.2;">${fmt(r.price)}</div>`
           + `<div class="${cls(r.d1)}" style="font-size:.88rem; font-weight:700; margin-top:2px;">${arrow} ${fmt(Math.abs(r.diff))}(${pct(r.d1)})</div>`
-          + `<div class="sub">近5日 <b class="${cls(r.d5)}">${pct(r.d5)}</b>${sinceTxt}</div>${r.svg}</div>`;
+          + `<div class="sub">近5日 <b class="${cls(r.d5)}">${pct(r.d5)}</b>${sinceTxt}</div>${r.svg}${sigTxt}</div>`;
       }).join('')
     + `</div><p class="hint" style="margin-top:8px;">${welcome ? welcome + '<br>' : ''}${baseHint}<br>${whoHint}<br>💡 手機用戶:瀏覽器選單 →「加入主畫面」,開盤想查,一點就開。</p>`;
   board.style.display = 'block';
@@ -2624,6 +2636,22 @@ async function renderAiInsight(stockId, name){
     // ═══ 三層資訊架構:①膠囊速讀(3 秒) ②標註 K 線圖(視覺) ③展開層(白話解讀+順勢檢查表) ═══
     let ckObj = null;
     try{ ckObj = taChecklist(s, instNet); }catch(e){}
+    // 🗂 訊號日誌:記下「這檔、這天、工具判了什麼燈、當時股價與防守位」——回訪時才能回答「後來呢?」
+    try{
+      if(ckObj){
+        const v = ckObj.verdict;
+        const tag = v.includes('不利') ? '不利' : v.includes('友善') ? '友善' : v.includes('買點浮現') ? '買點浮現'
+                  : v.includes('爆出漲停') ? '攻擊發起' : v.includes('醞釀') ? '醞釀' : v.includes('作頭') ? '警戒' : '中性';
+        const log = JSON.parse(localStorage.getItem('sigLog') || '{}');
+        const prev = log[stockId];
+        // 同一個判讀延續就保留「首次出現日與當時價」,判讀改變才更新——這樣「當時」才有意義
+        if(!prev || prev.t !== tag) log[stockId] = {d: end, t: tag, p: lastC, s: ckObj.lastLow};
+        else { prev.s = ckObj.lastLow; log[stockId] = prev; }
+        const ids = Object.keys(log);
+        if(ids.length > 30) ids.slice(0, ids.length - 30).forEach(k => delete log[k]);
+        localStorage.setItem('sigLog', JSON.stringify(log));
+      }
+    }catch(e){}
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
     if(relDiff != null) pills += `<span class="pill">對大盤 ${Math.abs(relDiff) < 1
