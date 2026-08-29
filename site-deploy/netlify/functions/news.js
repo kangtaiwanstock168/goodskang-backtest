@@ -32,7 +32,8 @@ exports.handler = async () => {
     }catch(e){ return []; }
   };
   const fetchStock = async id => {
-    const parts = await Promise.all(days.map(d => fetchRaw(id, d)));
+    // 週末視窗最多取 3 天,避免請求量爆炸拖垮函式
+    const parts = await Promise.all(days.slice(0, 3).map(d => fetchRaw(id, d)));
     const seen = new Set(), out = [];
     let mkt = 0;
     for(const x of [].concat(...parts)){
@@ -47,12 +48,15 @@ exports.handler = async () => {
     }
     return {out, mkt};
   };
+  // 時間預算:Netlify 免費函式 10 秒上限,週末視窗會拉到 3 天(請求量 ×3)——逼近上限就先回傳已抓到的
+  const DEADLINE = Date.now() + 7500;
   const rows = [];
-  for(let i = 0; i < POOL.length; i += 16){
-    const part = await Promise.all(POOL.slice(i, i + 16).map(fetchStock));
+  for(let i = 0; i < POOL.length; i += 22){
+    if(Date.now() > DEADLINE) break;
+    const part = await Promise.all(POOL.slice(i, i + 22).map(fetchStock));
     rows.push(...part);
   }
-  const res = POOL.map((id, i) => ({id, list: rows[i].out, mkt: rows[i].mkt})).filter(x => x.list.length > 0 || x.mkt >= 3);
+  const res = POOL.slice(0, rows.length).map((id, i) => ({id, list: rows[i].out, mkt: rows[i].mkt})).filter(x => x.list.length > 0 || x.mkt >= 3);
   // 主題聚類:同一主題詞出現在哪些股票的標題裡,就是市場正在寫的供應鏈
   const themes = [];
   for(const th of THEMES){
