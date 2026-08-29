@@ -119,6 +119,11 @@
   footer{text-align:center; color:var(--muted); font-size:.75rem; margin-top:24px; line-height:1.6;}
   h2.section{font-size:1.05rem; margin-bottom:14px; color:var(--accent);}
   #fab{display:none; position:fixed; right:14px; bottom:18px; z-index:80; width:auto; padding:11px 18px; border-radius:999px; background:var(--accent); color:#0d1117; font-weight:700; font-size:.9rem; box-shadow:0 4px 16px rgba(0,0,0,.55);}
+  /* 可點卡片:一定要看起來像按鈕,否則使用者不知道能點(手機沒有 hover,提示必須常駐) */
+  .stat.tap{position:relative; transition:border-color .15s, transform .15s, box-shadow .15s;}
+  .stat.tap:hover{border-color:var(--accent); transform:translateY(-2px); box-shadow:0 4px 14px rgba(88,166,255,.18);}
+  .stat.tap::after{content:"🔍 點我看完整分析"; display:block; margin-top:8px; padding-top:6px; border-top:1px dashed var(--border); font-size:.72rem; color:var(--accent); font-weight:700; letter-spacing:.5px;}
+  .stat.tap:hover::after{color:var(--text);}
   .live-dot{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--red); margin:0 5px 1px 0; animation:pulse 1.2s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.2;}}
   @media (max-width:640px){
@@ -160,7 +165,7 @@
 
   <div class="card" id="topicCard" style="display:none;">
     <h2 class="section">📰 話題雷達——新聞正在追的股票</h2>
-    <p class="subtitle">近 36 小時(跨週末自動延長到週五),哪些股票被新聞點名最多次?統計主流財經媒體<b style="color:var(--text);">報導則數</b>排序(客觀計數,非推薦)——蘋果發表會、輝達財報這種大事,相關供應鏈會自己浮上來。點卡片直接跑檢查表+回測:</p>
+    <p class="subtitle">近 36 小時(跨週末自動延長到週五),哪些股票被新聞點名最多次?統計主流財經媒體<b style="color:var(--text);">報導則數</b>排序(客觀計數,非推薦)——蘋果發表會、輝達財報這種大事,相關供應鏈會自己浮上來。<br><b style="color:var(--accent);">👇 每張卡片都能點——點下去馬上跑五燈檢查表、標註 K 線與完整回測</b></p>
     <p id="topicThemes" style="display:none; margin:0 0 10px; font-size:.9rem; color:var(--muted); line-height:2.1;"></p>
     <div class="stats" id="topicBox"></div>
     <p class="hint" style="margin-top:8px;" id="topicHint"></p>
@@ -168,14 +173,14 @@
 
   <div class="card" id="radarCard" style="display:none;">
     <h2 class="section">⚡ 盤後強勢股雷達——今天市場最有戲的股票</h2>
-    <p class="subtitle">官方最新收盤全市場掃描:<b style="color:var(--accent);">🔥 人氣王</b>(成交值最大的上漲權值股)+<b style="color:var(--red);">強勢股</b>(漲幅 ≥5%、成交值 ≥1 億)——<b style="color:var(--text);">點任一檔直接跑完整檢查表與回測</b>。僅為客觀數據排序,非選股建議。</p>
+    <p class="subtitle">官方最新收盤全市場掃描:<b style="color:var(--accent);">🔥 人氣王</b>(成交值最大的上漲權值股)+<b style="color:var(--red);">強勢股</b>(漲幅 ≥5%、成交值 ≥1 億)。<br><b style="color:var(--accent);">👇 每張卡片都能點——點下去馬上跑五燈檢查表與完整回測</b>(僅為客觀數據排序,非選股建議)</p>
     <div class="stats" id="radarBox"></div>
     <p class="hint" style="margin-top:8px;" id="radarHint">⏰ 上市:證交所盤後行情(約 14:00 更新);上櫃:櫃買開放資料(更新較晚,可能落後半天)。想看盤中誰在噴,參考上方話題雷達的即時價。點卡片下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
   </div>
 
   <div class="card" id="topic2Card" style="display:none;">
     <h2 class="section">📰 更多話題股——完整新聞熱度榜</h2>
-    <div class="stats" id="topic2Box"></div>
+    <p class="subtitle" style="margin-top:-6px;"><b style="color:var(--accent);">👇 每張卡片都能點,直接看該檔的完整分析</b></p><div class="stats" id="topic2Box"></div>
     <p class="hint" id="topic2Hint" style="margin-top:8px;">接續頁面最上方的話題雷達,合計列出新聞熱度前 15 名。</p>
   </div>
 
@@ -321,7 +326,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260830-D|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260830-E|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -343,7 +348,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260830-D';
+const APP_VER = 'v20260830-E';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1974,7 +1979,7 @@ async function refreshWatchBoard(){
               + `${sg.d.slice(5).replace('-','/')} 判「<b style="color:${col};">${sg.t}</b>」→ 至今 <b class="${cls(ch)}">${pct(ch)}</b>${guard ? '|' + guard : ''}</div>`;
           }
         }catch(e){}
-        return `<div class="stat"${clickable ? ` style="cursor:pointer;" onclick="quickRun('${r.w.id} ${label}')"` : ' style="border-color:var(--accent);"'}>`
+        return `<div class="stat${clickable ? ' tap' : ''}"${clickable ? ` style="cursor:pointer;" onclick="quickRun('${r.w.id} ${label}')"` : ' style="border-color:var(--accent);"'}>`
           + `<div class="label">${label}<span style="float:right; font-size:.7rem;">${r.tag}</span></div>`
           + `<div class="${cls(r.d1)}" style="font-size:1.65rem; font-weight:800; line-height:1.2;">${fmt(r.price)}</div>`
           + `<div class="${cls(r.d1)}" style="font-size:.88rem; font-weight:700; margin-top:2px;">${arrow} ${fmt(Math.abs(r.diff))}(${pct(r.d1)})</div>`
@@ -2073,7 +2078,7 @@ async function renderRadar(){
     box.innerHTML = hot.map(h => {
       const lu = h.pct >= 9.4, label = (h.name || h.id).replace(/[<>'"]/g, '');
       const tag = h.k ? '<span style="color:var(--accent); font-weight:700;">🔥 人氣</span>' : (lu ? '<span style="color:var(--red); font-weight:700;">🔒 漲停</span>' : '<span style="opacity:.7;">強勢</span>');
-      return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
+      return `<div class="stat tap" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
         + `<div class="label">${label}<span style="float:right; font-size:.7rem;">${tag}</span></div>`
         + `<div class="up" style="font-size:1.4rem; font-weight:800; line-height:1.2;">${fmt(h.c)}</div>`
         + `<div class="up" style="font-size:.88rem; font-weight:700; margin-top:2px;">▲ ${pct(h.pct)}</div>`
@@ -2127,7 +2132,7 @@ async function renderTopic(){
       const mid = hasP
         ? `<div class="${cls(d1)}" style="font-size:1.35rem; font-weight:800; line-height:1.2;">${fmt(lv.p)}</div><div class="${cls(d1)}" style="font-size:.85rem; font-weight:700;">${pct(d1)}</div>`
         : `<div style="font-size:1.2rem; font-weight:800; color:var(--accent); line-height:1.4;">📰 ${x.n} 則</div>`;
-      return `<div class="stat" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
+      return `<div class="stat tap" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
         + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:var(--gold); font-weight:700;">${x.n} 則報導</span></div>`
         + mid
         + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div></div>`;
