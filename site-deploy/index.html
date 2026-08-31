@@ -326,7 +326,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260830-E|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260831-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -348,7 +348,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260830-E';
+const APP_VER = 'v20260831-A';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2273,7 +2273,15 @@ function taChecklist(s, instNet){
   const hi20 = Math.max(...c.slice(-20));
   const body = Math.abs(last.close - last.open), upSh = last.max - Math.max(last.close, last.open);
   if(last.close >= hi20 * 0.97 && volX >= 2 && upSh > body){ vIcon = '❌'; vTxt += ';且高檔爆量收長上影——出貨警訊'; }
-  if(last.live) vTxt += '(今日盤中,量為全日推估)';
+  // 盤中前 90 分鐘的量能推估誤差大(開盤爆量、中午轉淡),此時不下量價判決,只描述現況
+  if(last.live){
+    if(last.elapsed && last.elapsed < 90){
+      vIcon = '⚠️';
+      vTxt = `⏳ <b>盤中前段(開盤 ${last.elapsed} 分鐘),量能推估誤差大,暫不判讀</b>——目前累積量已達 5 日均量的 ${(volX * (last.frac || 1)).toFixed(1)} 倍;等 10:30 後推估才穩定`;
+    }else{
+      vTxt += `(<b>今日盤中,量為全日推估</b>,收盤前都可能變動)`;
+    }
+  }
   items.push({icon: vIcon, name: '量價', txt: vTxt});
   // ⑤ 法人籌碼:外資+投信近 5 日合計——漲勢有沒有法人真金白銀,決定續航力;法人賣、行情漲=別人在拉,隔日沖劇本警戒
   if(instNet != null){
@@ -2500,7 +2508,7 @@ async function renderAiInsight(stockId, name){
     try{ if(b.length){ const tb = await fetchTodayBar('0050', b[b.length-1].date, end); if(tb) b.push(tb); } }catch(e){}
     // ⏱ 盤中:拼上「進行中的今日 K 棒」——當沖客上午看的必須是今天,不是昨天
     // 量能用「開盤至今 ÷ 已開盤時間 × 全日 270 分鐘」推估,這是短線圈通用的預估量算法
-    let liveBar = false, lvInfo = null;
+    let liveBar = false, lvInfo = null, liveElapsed = 0;
     try{
       // 只要今天已開過盤(平日 9:00 後)而官方資料還沒有今天,就用即時源拼今日 K 棒
       // ——收盤後 Yahoo 立刻有完整全日資料,不用等證交所/櫃買晚上更新(上櫃股尤其慢)
@@ -2511,9 +2519,21 @@ async function renderAiInsight(stockId, name){
         const lv = lm[stockId] || await fetchLive(stockId).catch(() => null);
         if(lv && lv.p > 0){
           lvInfo = lv;
-          const nowT = new Date(), elapsed = Math.min(270, Math.max(10, nowT.getHours() * 60 + nowT.getMinutes() - 540));
-          const vProj = lv.vol > 0 ? Math.round(lv.vol * 270 / elapsed) : 0;
-          s.push({date: end, open: lv.o > 0 ? lv.o : lv.p, max: lv.h > 0 ? lv.h : lv.p, min: lv.l > 0 ? lv.l : lv.p, close: lv.p, Trading_Volume: vProj, live: true});
+          const nowT = new Date(), elapsed = Math.min(270, Math.max(5, nowT.getHours() * 60 + nowT.getMinutes() - 540));
+          // 台股盤中量能不是線性累積:開盤首小時約占全日三成、中午最淡、尾盤集合競價又爆量
+          // 用實測分布曲線推估,才不會在早盤把量灌成兩倍(線性推估的老毛病)
+          const CURVE = [[0,0],[15,.12],[30,.19],[60,.30],[90,.38],[120,.45],[150,.52],[180,.58],[210,.65],[240,.74],[265,.88],[270,1]];
+          let frac = 1;
+          for(let k = 1; k < CURVE.length; k++){
+            if(elapsed <= CURVE[k][0]){
+              const [x0, y0] = CURVE[k-1], [x1, y1] = CURVE[k];
+              frac = y0 + (y1 - y0) * (elapsed - x0) / (x1 - x0);
+              break;
+            }
+          }
+          liveElapsed = elapsed;
+          const vProj = (lv.vol > 0 && frac > 0.05) ? Math.round(lv.vol / frac) : 0;
+          s.push({date: end, open: lv.o > 0 ? lv.o : lv.p, max: lv.h > 0 ? lv.h : lv.p, min: lv.l > 0 ? lv.l : lv.p, close: lv.p, Trading_Volume: vProj, live: true, elapsed, frac});
           liveBar = true;
         }
       }
@@ -2592,7 +2612,10 @@ async function renderAiInsight(stockId, name){
       const tX = vPrev5 > 0 ? volBars[volBars.length - 1].Trading_Volume / vPrev5 : 0;
       let volTxt;
       const dToday = (last6[5].close - last6[4].close) / last6[4].close * 100;
-      if(vChg >= 25 && ret5 <= -0.5 && dToday >= 5) volTxt = `這週整體還收黑,但<b>今天單日大漲 ${pct(dToday)} 帶量</b>——多空一日翻盤,週線劇本被今天改寫;能不能延續,看明天的量能接不接得上`;
+      const isLiveBar = !!(s[s.length-1] && s[s.length-1].live);
+      const estTag = isLiveBar ? '(盤中推估量)' : '';
+      if(dToday <= -3 && ret5 >= 0.5) volTxt = `這五天整體是上漲的,但<b>今天單日回檔 ${pct(dToday)}</b>——強勢股的正常換氣還是變盤起點,看今天量能與收盤位置${estTag ? ';' + estTag + '尚未定案' : ''}`;
+      else if(vChg >= 25 && ret5 <= -0.5 && dToday >= 5) volTxt = `這週整體還收黑,但<b>今天單日大漲 ${pct(dToday)} 帶量</b>——多空一日翻盤,週線劇本被今天改寫;能不能延續,看明天的量能接不接得上`;
       else if(vChg <= -25 && ret5 >= 0.5 && tX >= 1.3) volTxt = `這週整體量能較前一週退潮 <b>${Math.abs(vChg).toFixed(0)}%</b>,但今天單日回神放量 <b>${tX.toFixed(1)}×</b>——資金剛回頭,漲勢有沒有續命,看明後天量能接不接得上`;
       else if(Math.abs(vChg) < 25) volTxt = pick([`近 5 日均量與前一週相當(${vs}),資金沒有明顯進出的痕跡`,
                                              `量能持平(較前一週 ${vs}),盤面像在等下一個催化劑`]);
@@ -2609,7 +2632,7 @@ async function renderAiInsight(stockId, name){
         ? `量縮 <b>${Math.abs(vChg).toFixed(0)}%</b> 下跌,殺盤力道趨緩,但也代表還沒人想伸手`
         : `價格沒動、量能卻退潮 <b>${Math.abs(vChg).toFixed(0)}%</b>——市場在觀望,通常要等量重新回來才有行情`;
       const lastV = volBars[volBars.length-1];
-      if(lastV.Trading_Volume >= 1.8 * v5) volTxt += `;另外 ${md(lastV.date)} 爆出 5 日均量 ${(lastV.Trading_Volume / v5).toFixed(1)} 倍的大量——有大部位在動作,後續幾天值得盯`;
+      if(lastV.Trading_Volume >= 1.8 * v5) volTxt += `;另外 ${md(lastV.date)} 爆出 5 日均量 ${(lastV.Trading_Volume / v5).toFixed(1)} 倍的大量${lastV.live ? '(<b>盤中推估,收盤才算數</b>)' : '——有大部位在動作,後續幾天值得盯'}`;
       bullets.push(volTxt + '。');
     }
 
