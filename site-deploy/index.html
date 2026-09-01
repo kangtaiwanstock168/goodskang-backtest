@@ -326,7 +326,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260831-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260901-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -348,7 +348,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260831-B';
+const APP_VER = 'v20260901-A';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2124,6 +2124,15 @@ async function renderTopic(){
     // 帶最新價格(盤中=即時,收盤後/週末=最後收盤)——紅綠一眼看熱鬧在哪
     let lm = {};
     try{ lm = await fetchLiveBatch(top.map(x => x.id)); }catch(e){ lm = {}; }
+    // 🔥 事件強度排序:純看報導則數會把「連日累積的舊話題」排在「今天引爆的重磅」前面
+    // 加權方式:報導數 × 今日價格反應——市場用錢投票的,才是今天真正的大事
+    top.forEach(x => {
+      const lv2 = lm[x.id];
+      const dAbs = (lv2 && lv2.p > 0 && lv2.prev > 0) ? Math.abs((lv2.p - lv2.prev) / lv2.prev * 100) : 0;
+      x.burst = (x.n >= 8 && dAbs >= 5);           // 報導夠多 + 今日大漲跌 = 今日爆發
+      x.impact = x.n * (1 + Math.min(dAbs, 10) / 4);
+    });
+    top.sort((a, b) => (b.burst - a.burst) || (b.impact - a.impact));
     const mkCard = x => {
       const nm = nameOf(x.id).replace(/[<>'"]/g, '');
       const lv = lm[x.id];
@@ -2133,7 +2142,7 @@ async function renderTopic(){
         ? `<div class="${cls(d1)}" style="font-size:1.35rem; font-weight:800; line-height:1.2;">${fmt(lv.p)}</div><div class="${cls(d1)}" style="font-size:.85rem; font-weight:700;">${pct(d1)}</div>`
         : `<div style="font-size:1.2rem; font-weight:800; color:var(--accent); line-height:1.4;">📰 ${x.n} 則</div>`;
       return `<div class="stat tap" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
-        + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:var(--gold); font-weight:700;">${x.n} 則報導</span></div>`
+        + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:${x.burst ? 'var(--red)' : 'var(--gold)'}; font-weight:700;">${x.burst ? '🔥 今日爆發・' : ''}${x.n} 則</span></div>`
         + mid
         + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div></div>`;
     };
