@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-C|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-G|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-C';
+const APP_VER = 'v20260902-G';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1830,63 +1830,147 @@ function bumpStreak(){
 // 📸 限動分享圖卡:把五燈檢查表+標註K線畫成 1080×1920 直式圖,手機直接分享、電腦下載
 async function makeShareCard(){
   const d = window.__cardD;
-  if(!d) return;
+  if(!d){ alert('圖卡資料還沒準備好——請先跑一次分析,等 AI 解析區出現後再按。'); return; }
   const strip = t => String(t || '').replace(/<[^>]*>/g, '');
   const W = 1080, H = 1920, cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const x = cv.getContext('2d');
-  const wrap = (txt, mw) => { const out = []; let ln = ''; for(const ch of txt){ if(x.measureText(ln + ch).width > mw){ out.push(ln); ln = ch; } else ln += ch; } if(ln) out.push(ln); return out; };
+  const F = sz => `${sz}px "Noto Sans TC",sans-serif`;
+  const rr = (x0, y0, w, h, r) => { x.beginPath(); if(x.roundRect) x.roundRect(x0, y0, w, h, r); else x.rect(x0, y0, w, h); x.closePath(); };
+  // 多色一行字:各段自己上色,置中排
+  const segLine = (segs, cy, fnt) => {
+    x.font = fnt; x.textAlign = 'left';
+    const tw = segs.reduce((a, s2) => a + x.measureText(s2.t).width, 0);
+    let cx = (W - tw) / 2;
+    for(const s2 of segs){ x.fillStyle = s2.c; x.fillText(s2.t, cx, cy); cx += x.measureText(s2.t).width; }
+    x.textAlign = 'center';
+  };
+  // 🕯 吉祥物「K 寶」:一根有臉的 K 棒——賺紅賠綠,影線就是頭髮和腳
+  const kbao = (cx, cy, sc, mood) => {
+    const bw = 180 * sc, bh = 235 * sc;
+    const col = mood === 'flat' ? '#d2a53a' : (mood === 'win' || mood === 'bigwin') ? '#e8564a' : '#3f9e63';
+    const dark = mood === 'flat' ? '#9a7620' : (mood === 'win' || mood === 'bigwin') ? '#a93328' : '#2c7047';
+    x.strokeStyle = dark; x.lineWidth = 13 * sc; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(cx, cy - bh / 2 - 52 * sc); x.lineTo(cx, cy - bh / 2); x.stroke();
+    x.beginPath(); x.moveTo(cx, cy + bh / 2); x.lineTo(cx, cy + bh / 2 + 52 * sc); x.stroke();
+    x.fillStyle = col; x.strokeStyle = dark; x.lineWidth = 7 * sc;
+    rr(cx - bw / 2, cy - bh / 2, bw, bh, 34 * sc); x.fill(); x.stroke();
+    // 腮紅
+    x.globalAlpha = .5; x.fillStyle = '#ffd7d0';
+    x.beginPath(); x.arc(cx - 58 * sc, cy + 14 * sc, 15 * sc, 0, 7); x.fill();
+    x.beginPath(); x.arc(cx + 58 * sc, cy + 14 * sc, 15 * sc, 0, 7); x.fill();
+    x.globalAlpha = 1;
+    // 眼睛
+    x.strokeStyle = '#2b1d14'; x.fillStyle = '#2b1d14'; x.lineWidth = 8 * sc;
+    if(mood === 'bigwin' || mood === 'win'){
+      x.beginPath(); x.arc(cx - 38 * sc, cy - 22 * sc, 16 * sc, Math.PI, 2 * Math.PI); x.stroke();
+      x.beginPath(); x.arc(cx + 38 * sc, cy - 22 * sc, 16 * sc, Math.PI, 2 * Math.PI); x.stroke();
+    }else{
+      x.beginPath(); x.arc(cx - 38 * sc, cy - 26 * sc, 11 * sc, 0, 7); x.fill();
+      x.beginPath(); x.arc(cx + 38 * sc, cy - 26 * sc, 11 * sc, 0, 7); x.fill();
+    }
+    // 嘴巴
+    if(mood === 'bigwin'){ x.fillStyle = '#5a2320'; x.beginPath(); x.arc(cx, cy + 30 * sc, 30 * sc, 0, Math.PI); x.fill(); }
+    else if(mood === 'win'){ x.beginPath(); x.arc(cx, cy + 22 * sc, 28 * sc, .2 * Math.PI, .8 * Math.PI); x.stroke(); }
+    else if(mood === 'flat'){ x.beginPath(); x.moveTo(cx - 26 * sc, cy + 34 * sc); x.lineTo(cx + 26 * sc, cy + 34 * sc); x.stroke(); }
+    else { x.beginPath(); x.arc(cx, cy + 52 * sc, 26 * sc, 1.2 * Math.PI, 1.8 * Math.PI); x.stroke(); }
+    // 眼淚(賠錢)/彩帶(大賺)
+    if(mood === 'lose' || mood === 'biglose'){
+      x.fillStyle = '#58a6ff';
+      const drop = (dx, dy, r0) => { x.beginPath(); x.arc(cx + dx, cy + dy, r0, 0, 7); x.fill(); };
+      drop(-38 * sc, 2 * sc, 8 * sc); if(mood === 'biglose'){ drop(38 * sc, 6 * sc, 8 * sc); drop(-40 * sc, 30 * sc, 6 * sc); }
+    }
+    if(mood === 'bigwin'){
+      const cf = [[-140,-150,'#d29922'],[130,-170,'#58a6ff'],[-170,-40,'#e8564a'],[165,-60,'#3f9e63'],[-120,90,'#58a6ff'],[150,80,'#d29922'],[0,-190,'#e8564a']];
+      for(const [dx, dy, c2] of cf){ x.save(); x.translate(cx + dx * sc, cy + dy * sc); x.rotate((dx + dy) % 3); x.fillStyle = c2; x.fillRect(-11 * sc, -5 * sc, 22 * sc, 10 * sc); x.restore(); }
+    }
+  };
+  // ── 背景+品牌 ──
   x.fillStyle = '#0d1117'; x.fillRect(0, 0, W, H);
   x.fillStyle = '#d29922'; x.fillRect(0, 0, W, 8);
   x.textAlign = 'center';
-  x.fillStyle = '#d29922'; x.font = 'bold 54px "Noto Sans TC",sans-serif'; x.fillText('📈 阿康的台股 AI 作戰室', W / 2, 112);
-  x.fillStyle = '#8b949e'; x.font = '34px "Noto Sans TC",sans-serif'; x.fillText(`${d.date}・順勢技術檢查表(${d.score}/${d.nItems} 綠燈)`, W / 2, 172);
-  x.fillStyle = '#e6edf3'; x.font = 'bold 86px "Noto Sans TC",sans-serif'; x.fillText(`${d.nm} ${d.id}`, W / 2, 296);
-  x.fillStyle = d.pct >= 0 ? '#f85149' : '#3fb950';
-  x.font = 'bold 62px "Noto Sans TC",sans-serif'; x.fillText(`${d.price}  ${d.pct >= 0 ? '+' : ''}${d.pct.toFixed(2)}%`, W / 2, 386);
-  let y0 = 430;
+  x.fillStyle = '#d29922'; x.font = 'bold ' + F(50); x.fillText('📈 阿康的台股 AI 作戰室', W / 2, 100);
+  // ── 奶油票券:一個訊息一層,行距拉開 ──
+  const bt = window.__btSum;
+  let mood = 'flat', head = '📐 今天的功課做完了', hc = '#b8860b';
+  const py = 148;
+  let ph = 430;
+  if(bt && bt.inv > 0){
+    const wan = v => Math.abs(v) >= 10000 ? (v / 10000).toFixed(1).replace(/\.0$/, '') + ' 萬' : Math.round(v).toLocaleString('zh-TW') + ' 元';
+    const r2 = bt.ret, up = bt.pf >= 0, bch = (typeof bt.bench === 'number') ? bt.bench : null;
+    if(Math.abs(r2) < 2){ head = '沒賺沒賠~當作練功'; mood = 'flat'; }
+    else if(r2 >= 15){ head = '好耶~這波抱住了!'; mood = 'bigwin'; }
+    else if(r2 >= 5){ head = '小賺入袋~穩穩的'; mood = 'win'; }
+    else if(up){ head = '有賺~紀律有價值'; mood = 'win'; }
+    else if(r2 > -10){ head = '小賠~還好先回測'; mood = 'lose'; }
+    else { head = '嗚~這劇本會受傷'; mood = 'biglose'; }
+    if(bch != null && r2 >= 2 && bch - r2 >= 5){ head = '有賺~但不如抱 0050'; mood = 'flat'; }
+    if(bch != null && r2 < 0 && bch >= 5){ head = '嗚~同期 0050 默默在漲'; mood = 'biglose'; }
+    hc = Math.abs(r2) < 2 || mood === 'flat' ? '#b8860b' : up ? '#c2402a' : '#2e7d4f';
+    ph = bch != null ? 660 : 585;
+    x.fillStyle = '#f7f1e3'; rr(60, py, W - 120, ph, 36); x.fill();
+    x.fillStyle = '#6b5d4a'; x.font = F(36); x.fillText(`${d.nm} ${d.id}・${bt.b.slice(5).replace('-', '/')} → ${bt.e.slice(5).replace('-', '/')}・投入 ${wan(bt.inv)}`, W / 2, py + 78);
+    x.fillStyle = hc; x.font = 'bold ' + F(78); x.fillText(head, W / 2, py + 190);
+    x.fillStyle = hc; x.font = 'bold ' + F(150); x.fillText(`${up ? '+' : '-'}${wan(Math.abs(bt.pf))}`, W / 2, py + 385);
+    x.fillStyle = '#4a4137'; x.font = 'bold ' + F(44); x.fillText(`期末 ${wan(bt.fin)}(${r2 >= 0 ? '+' : ''}${r2.toFixed(2)}%)`, W / 2, py + 480);
+    if(bch != null){
+      const diff = r2 - bch;
+      // 各自上色:0050 的漲跌照紅漲綠跌,勝負另外上色——不再混色
+      segLine([
+        {t: '同期 0050 ', c: '#6b5d4a'},
+        {t: `${bch >= 0 ? '+' : ''}${bch.toFixed(1)}%`, c: bch >= 0 ? '#c2402a' : '#2e7d4f'},
+        {t: '  ', c: '#6b5d4a'},
+        {t: diff >= 0 ? `🏆 贏大盤 ${diff.toFixed(1)}%` : `輸大盤 ${Math.abs(diff).toFixed(1)}%`, c: diff >= 0 ? '#c2402a' : '#2e7d4f'}
+      ], py + 580, 'bold ' + F(42));
+    }
+  }else{
+    x.fillStyle = '#f7f1e3'; rr(60, py, W - 120, ph, 36); x.fill();
+    x.fillStyle = '#6b5d4a'; x.font = F(36); x.fillText(`${d.nm} ${d.id}・${d.date}`, W / 2, py + 78);
+    x.fillStyle = hc; x.font = 'bold ' + F(78); x.fillText(head, W / 2, py + 200);
+    x.fillStyle = '#4a4137'; x.font = F(42); x.fillText(`順勢檢查表 ${d.score}/${d.nItems} 綠燈`, W / 2, py + 300);
+  }
+  let y0 = py + ph + 30;
+  // ── K 寶登場:有K線圖時站右側探頭,沒圖時當主角置中 ──
   const kc = document.getElementById('kchart');
-  if(kc && kc.width > 0){
-    const kw = 1000, kh = Math.min(560, Math.round(kc.height * kw / kc.width));
-    x.fillStyle = '#161b22'; x.fillRect(30, y0 - 10, kw + 20, kh + 20);
-    x.drawImage(kc, 40, y0, kw, kh);
-    y0 += kh + 50;
+  const hasK = kc && kc.width > 0;
+  if(hasK){
+    kbao(W - 190, y0 + 150, .82, mood);
+    x.textAlign = 'center'; x.fillStyle = '#e6edf3'; x.font = 'bold ' + F(46);
+    x.fillText(`今日 ${d.price}`, 330, y0 + 130);
+    x.fillStyle = d.pct >= 0 ? '#f85149' : '#3fb950'; x.font = 'bold ' + F(52);
+    x.fillText(`${d.pct >= 0 ? '▲ +' : '▼ '}${d.pct.toFixed(2)}%`, 330, y0 + 200);
+    y0 += 320;
+    const kw = 960, kh = Math.min(400, Math.round(kc.height * kw / kc.width));
+    x.fillStyle = '#161b22'; rr(50, y0, kw + 20, kh + 20, 20); x.fill();
+    x.drawImage(kc, 60, y0 + 10, kw, kh);
+    y0 += kh + 96;
+  }else{
+    kbao(W / 2, y0 + 220, 1.35, mood);
+    x.fillStyle = '#e6edf3'; x.font = 'bold ' + F(46);
+    x.fillText(`今日 ${d.price}`, W / 2 - 150, y0 + 560);
+    x.fillStyle = d.pct >= 0 ? '#f85149' : '#3fb950';
+    x.fillText(`${d.pct >= 0 ? '▲ +' : '▼ '}${d.pct.toFixed(2)}%`, W / 2 + 200, y0 + 560);
+    y0 += 660;
   }
-  x.textAlign = 'left';
-  // 綜合判定框
-  x.font = 'bold 40px "Noto Sans TC",sans-serif';
-  const vLines = wrap(strip(d.verdict), 940).slice(0, 3);
-  const vh = vLines.length * 56 + 36;
-  x.strokeStyle = '#d29922'; x.lineWidth = 3; x.fillStyle = 'rgba(210,153,34,.09)';
-  x.fillRect(40, y0, 1000, vh); x.strokeRect(40, y0, 1000, vh);
-  x.fillStyle = '#d29922';
-  vLines.forEach((ln, i) => x.fillText(ln, 70, y0 + 62 + i * 56));
-  y0 += vh + 44;
-  // 五燈逐項(短版)
-  x.font = '38px "Noto Sans TC",sans-serif';
-  for(const it of d.items.slice(0, 5)){
-    const short = strip(it.txt).split(/[,;(——]/)[0].slice(0, 20);
-    x.fillStyle = '#e6edf3';
-    x.fillText(`${it.icon} ${it.name}`, 60, y0);
-    x.fillStyle = '#8b949e';
-    x.fillText(short, 340, y0);
-    y0 += 62;
-  }
-  y0 += 10;
-  x.fillStyle = '#58a6ff'; x.font = 'bold 38px "Noto Sans TC",sans-serif';
-  x.fillText(`🛡 防守參考:${d.stop ? Number(d.stop).toLocaleString('zh-TW') : '—'}`, 60, y0);
-  // 頁尾
+  // ── 底部速覽帶:五燈+一句判定,小而輕 ──
   x.textAlign = 'center';
-  x.fillStyle = '#8b949e'; x.font = '30px "Noto Sans TC",sans-serif';
-  x.fillText('依公開資料自動產生・僅描述現狀、非投資建議・盈虧自負', W / 2, H - 130);
-  x.fillStyle = '#d29922'; x.font = 'bold 42px "Noto Sans TC",sans-serif';
-  x.fillText('goodskangtaiwanstock.netlify.app', W / 2, H - 62);
+  x.fillStyle = '#e6edf3'; x.font = 'bold ' + F(40);
+  x.fillText(d.items.slice(0, 5).map(it => `${it.icon}${it.name.slice(0, 2)}`).join('  '), W / 2, y0);
+  y0 += 62;
+  x.fillStyle = '#d29922'; x.font = F(34);
+  const v1 = strip(d.verdict).replace(/^🚦?\s*綜合[::]?/, '').split(/[——,]/)[0].slice(0, 26);
+  x.fillText(`🚦 ${v1}`, W / 2, y0);
+  // ── 頁尾 ──
+  x.fillStyle = '#8b949e'; x.font = F(29);
+  x.fillText('歷史回測結果・過去績效不代表未來・非投資建議・盈虧自負', W / 2, H - 128);
+  x.fillStyle = '#d29922'; x.font = 'bold ' + F(42);
+  x.fillText('goodskangtaiwanstock.netlify.app', W / 2, H - 60);
   track('share_card', {stock: d.id});
   cv.toBlob(async b => {
     if(!b) return;
     const f = new File([b], `akang_${d.id}_${d.date}.png`, {type: 'image/png'});
     if(navigator.canShare && navigator.canShare({files: [f]})){
-      try{ await navigator.share({files: [f], title: `${d.nm} 五燈檢查表`}); return; }catch(e){ if(e && e.name === 'AbortError') return; }
+      try{ await navigator.share({files: [f], title: `${d.nm} 回測戰績`}); return; }catch(e){ if(e && e.name === 'AbortError') return; }
     }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(b); a.download = f.name; a.click();
@@ -2845,7 +2929,7 @@ async function renderAiInsight(stockId, name){
     // 📸 分享圖卡資料:存下當前判讀,按鈕按下時照這份畫圖
     try{
       const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
-      window.__cardD = ckObj ? {id: stockId, nm: nameOf(stockId), date: end, price: fmt(lastC),
+      window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, price: fmt(lastC),
         pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
         stop: ckObj.lastLow, score: ckObj.score, nItems: ckObj.nItems} : null;
     }catch(e){ window.__cardD = null; }
@@ -2886,7 +2970,7 @@ async function renderAiInsight(stockId, name){
         + `<p style="margin:0 0 10px; padding:9px 12px; border-radius:8px; font-weight:700; border:1px solid ${bc}; background:${bg}; line-height:1.7;">${ckObj.verdict}</p>`
         + ckObj.items.map(x => `<p style="margin:6px 0; line-height:1.7; font-size:.95rem;">${x.icon} <b>${x.name}:</b>${x.txt}</p>`).join('')
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🛡 <b>防守參考:</b>${ckObj.stop}</p>`
-        + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 產生限動分享圖卡</button>`
+        + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 分享我的回測戰績卡(IG 限動尺寸)</button>`
         + `<p class="hint" style="margin-top:8px;">依經典順勢規則自動比對日K,僅描述現狀、非投資建議;當沖損益放大,風險自負。</p></div>`;
     }
     // ⚡ 盤中動能(當沖視角):跳空/VWAP 位置/距高點回落/漲停偵測——日K規則管環境,這裡管「今天盤面的即時姿態」
@@ -3102,6 +3186,15 @@ async function run(auto){
       const lhFinal = lhShares * data[data.length-1].close * (1 - lhSell);
       lumpHold = {inv:capital, final:lhFinal, profit:lhFinal-capital, ret:(lhFinal-capital)/capital*100};
     }
+    // 📸 分享圖卡用的回測總結:「我投入多少、期末多少」——這才是有人想看的故事
+    try{
+      window.__btSum = lumpHold ? {inv: lumpHold.inv, fin: lumpHold.final, pf: lumpHold.profit, ret: lumpHold.ret,
+        b: data[0].date, e: data[data.length - 1].date} : null;
+      // 同期 0050 對照:背景抓,抓到掛上 bench——台灣人最有感的基準線
+      if(window.__btSum && stockId !== '0050') fmData(`dataset=TaiwanStockPrice&data_id=0050&start_date=${data[0].date}&end_date=${data[data.length - 1].date}`)
+        .then(j => { const a = (j && j.data) || []; if(a.length >= 2 && window.__btSum) window.__btSum.bench = (a[a.length - 1].close / a[0].close - 1) * 100; })
+        .catch(() => {});
+    }catch(e){ window.__btSum = null; }
     renderBuyTables(data, s1,
       pullRes ? pullRes.retWin : null,
       swing3Best, swing4Best, swing5Best, comboBest, lumpHold, /^00/.test(stockId));
