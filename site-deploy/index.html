@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-M|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-O|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-M';
+const APP_VER = 'v20260902-O';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2755,13 +2755,17 @@ async function renderAiInsight(stockId, name){
     const stL = new Date(now); stL.setDate(stL.getDate() - 160);   // 個股多抓:順勢檢查表需要 60MA 與頭底轉折
     const startL = `${stL.getFullYear()}-${p2(stL.getMonth()+1)}-${p2(stL.getDate())}`;
     const clean = arr => (arr || []).filter(d => d.open > 0 && d.max > 0 && d.min > 0 && d.close > 0).sort((a,b) => a.date.localeCompare(b.date));
-    const [sRaw, bRaw, instRaw, newsRaw] = await Promise.all([
+    const [sRaw, bRaw, instRaw, newsRaw, fsRaw] = await Promise.all([
       fetchPrices(stockId, startL, end).catch(() => []),
       stockId === '0050' ? Promise.resolve([]) : fetchPrices('0050', start, end).catch(() => []),
       fmData(`dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stockId}&start_date=${start}&end_date=${end}`).then(j => j.data || []).catch(() => null),
       (() => { const nd = new Date(now); nd.setDate(nd.getDate() - 4);
         const ns = `${nd.getFullYear()}-${p2(nd.getMonth()+1)}-${p2(nd.getDate())}`;
-        return fmData(`dataset=TaiwanStockNews&data_id=${stockId}&start_date=${ns}&end_date=${end}`).then(j => j.data || []).catch(() => null); })()
+        return fmData(`dataset=TaiwanStockNews&data_id=${stockId}&start_date=${ns}&end_date=${end}`).then(j => j.data || []).catch(() => null); })(),
+      (() => { const fd = new Date(now); fd.setMonth(fd.getMonth() - 15);   // 抓近 15 個月財報,湊滿四季 EPS
+        const fs = `${fd.getFullYear()}-${p2(fd.getMonth()+1)}-${p2(fd.getDate())}`;
+        return /^00/.test(stockId) ? Promise.resolve(null)
+          : fmData(`dataset=TaiwanStockFinancialStatements&data_id=${stockId}&start_date=${fs}&end_date=${end}`).then(j => j.data || []).catch(() => null); })()
     ]);
     // 外資+投信近 5 個交易日合計買賣超(股)——給檢查表第五項「法人籌碼」
     let instNet = null;
@@ -3037,6 +3041,47 @@ async function renderAiInsight(stockId, name){
       : '';
     // ③ 儀表板雙欄:白話解讀(左)+順勢檢查表(右),電腦並排、手機堆疊,全部攤開不用點
     const subBox = 'background:rgba(88,166,255,.03); border:1px solid var(--border); border-radius:10px; padding:12px 14px;';
+    // 💰 本益比體檢:年化 EPS(依已公布季數推算)+目前倍數+近8個月區間對應倍數——估值貴不貴,一眼有感
+    let peHtml = '';
+    try{
+      if(!/^00/.test(stockId) && Array.isArray(fsRaw) && fsRaw.length){
+        const eq = fsRaw.filter(r2 => r2.type === 'EPS' && isFinite(r2.value)).sort((a2, b2) => a2.date.localeCompare(b2.date));
+        if(eq.length >= 2){
+          const mth = +eq[eq.length - 1].date.slice(5, 7);
+          const per = ({3: [1, 4], 6: [2, 2], 9: [3, 4 / 3], 12: [4, 1]})[mth] || [4, 1];
+          const ytd = eq.slice(-per[0]).reduce((a2, b2) => a2 + b2.value, 0);
+          const ann = +(ytd * per[1]).toFixed(2);                              // 今年年化
+          const ttm = eq.length >= 4 ? +eq.slice(-4).reduce((a2, b2) => a2 + b2.value, 0).toFixed(2) : null;   // 近四季
+          const qLabel = ({3: '第一季', 6: '上半年', 9: '前三季', 12: '全年'})[mth] || '';
+          if(ann > 0 && lastC > 0){
+            const pe = lastC / ann;
+            const hi2 = Math.max(...s.map(d2 => d2.max)), lo3 = Math.min(...s.map(d2 => d2.min));
+            const peHi = hi2 / ann, peLo = lo3 / ann;
+            const pos = peHi > peLo ? Math.min(100, Math.max(0, (pe - peLo) / (peHi - peLo) * 100)) : 50;
+            // 分級邏輯:每檔股票的天花板是「它自己的前波高倍數」,不是絕對值——
+            // 金融傳產永遠吃不到 25 倍,貼近自家歷史高就是貴;台積電 25 倍只是市場的公定基準錨
+            let tone, tc;
+            const nearHi = peHi > peLo && pe >= peHi * 0.97;
+            if(nearHi){ tone = `🚨 <b>已貼近它自己的前波高倍數(${peHi.toFixed(1)} 倍)</b>——不管這個族群天花板多高多低,這裡就是它歷史上市場願意出的最高價碼;要再上去,得靠獲利上修,不能只靠估值想像——追價風險此刻最大`; tc = 'var(--red)'; }
+            else if(pe >= 25){ tone = `🔶 <b>高於台積電基準(約 25 倍)</b>——但它前波高曾到 ${peHi.toFixed(1)} 倍,市場對這個族群本來就願意給更高的價碼;貴,但還沒到它自己的天花板——劇本要持續兌現,估值才撐得住`; tc = '#ffd23f'; }
+            else if(pe >= 19){ tone = `⚖️ <b>台積電基準區(19~25 倍)</b>——跟獲利怪物差不多的價碼,不貴不便宜;漲跌回歸籌碼與獲利動能,估值不是這檔現在的主角`; tc = 'var(--gold)'; }
+            else { tone = `🟢 <b>19 倍以內</b>——估值在便宜區;但便宜通常有它的理由(成長性、景氣循環、市場信心),配合上方五燈一起看,別單看便宜就進場`; tc = 'var(--green)'; }
+            peHtml = `<div style="${subBox} margin-top:12px;">`
+              + `<p style="font-weight:700; margin:0 0 8px; color:var(--gold);">💰 本益比體檢(財報自動抓取)</p>`
+              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">今年${qLabel} EPS <b>${ytd.toFixed(2)} 元</b> → 年化約 <b>${ann.toFixed(2)} 元</b>${ttm != null ? `|近四季合計 ${ttm.toFixed(2)} 元` : ''}</p>`
+              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">現價 ${fmt(lastC)} ÷ 年化 EPS = <b style="color:${tc}; font-size:1.05rem;">${pe.toFixed(1)} 倍</b>${ttm > 0 ? `(用近四季 EPS 算約 ${(lastC / ttm).toFixed(1)} 倍)` : ''}</p>`
+              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">近 8 個月:最高 ${fmt(hi2)}(約 <b>${peHi.toFixed(1)} 倍</b>)|最低 ${fmt(lo3)}(約 <b>${peLo.toFixed(1)} 倍</b>)——目前落在區間 <b>${pos.toFixed(0)}%</b> 的位置</p>`
+              + `<p style="margin:8px 0 0; line-height:1.8; font-size:.95rem; color:${tc};">${tone}</p>`
+              + `<p class="hint" style="margin-top:8px;">依公開財報自動計算;年化=已公布季數推估、不含未來預測;歷史倍數區間僅為事實紀錄,非目標價、不構成任何價位預測。財報是落後資訊,市場永遠在給「未來」定價。</p></div>`;
+          }else if(ann <= 0){
+            peHtml = `<div style="${subBox} margin-top:12px;">`
+              + `<p style="font-weight:700; margin:0 0 8px; color:var(--gold);">💰 本益比體檢(財報自動抓取)</p>`
+              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">今年${qLabel} EPS <b class="down">${ytd.toFixed(2)} 元(虧損)</b>——本益比不適用。這種股票走的是題材與轉機劇本,<b>估值錨完全失效,漲跌都會很極端</b>;籌碼與消息面比基本面重要,防守紀律要抓得比平常更緊。</p>`
+              + `<p class="hint" style="margin-top:8px;">依公開財報自動計算;非投資建議。</p></div>`;
+          }
+        }
+      }
+    }catch(e){}
     const proseHtml = `<div style="${subBox}"><p style="font-weight:700; margin:0 0 6px; color:var(--accent);">💬 AI 白話解讀</p>`
       + bullets.map(t => `<p style="margin:7px 0; line-height:1.8; font-size:.95rem;">• ${t}</p>`).join('') + `</div>`;
     let ckBoxHtml = '';
@@ -3095,7 +3140,8 @@ async function renderAiInsight(stockId, name){
       }
     }catch(e){}
     box.innerHTML = `<div style="margin-bottom:2px;">${pills}</div>` + newsHtml + dayHtml + chartHtml
-      + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`;
+      + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`
+      + peHtml;
     try{ if(ckObj) drawKChart($('kchart'), s.slice(-45), ckObj); }catch(e){}
     scrollToRes();   // AI 卡把頁面撐高了,重新對準結果區
   }catch(e){ card.style.display = 'none'; /* 解析失敗就收起,不影響主回測 */ }
