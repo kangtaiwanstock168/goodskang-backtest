@@ -97,6 +97,8 @@
   .best-box h3{color:var(--gold); font-size:1rem; margin-bottom:8px;}
   .best-box p{font-size:.92rem; line-height:1.7;}
   #results{display:none;}
+  /* 效能:結果頁很長,離開視窗的卡片先不渲染(捲到才畫)——首屏不再卡頓 */
+  #results > *:not(:first-child){content-visibility:auto; contain-intrinsic-size:auto 600px;}
   .chart-wrap{position:relative; height:380px;}
   table{width:100%; min-width:680px; border-collapse:collapse; font-size:.88rem;}
   .tbl-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:var(--accent) #21262d;}
@@ -326,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260901-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260901-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -348,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260901-A';
+const APP_VER = 'v20260901-B';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1796,6 +1798,18 @@ function render(stockId, name, data, r, mas, taiex, cmp){
 
 function quickRun(v){ $('stockId').value = v; run(); }
 
+// 🎯 捲動校正:按分析後,雷達/觀察站/AI 卡在背景陸續長出來,會把頁面往下推、讓視窗偏離結果區
+// 解法:捲動後 3.5 秒內每次有新內容完成就重新對準;使用者一動手(滾輪/觸控)立刻放手
+let scrollLockUntil = 0;
+function scrollToRes(){
+  if(Date.now() > scrollLockUntil) return;
+  const el = $('resTitle');
+  if(!el || $('results').style.display === 'none') return;
+  const y = el.getBoundingClientRect().top + window.pageYOffset - 8;
+  window.scrollTo({top: y, behavior: 'auto'});
+}
+['wheel', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, () => { scrollLockUntil = 0; }, {passive: true}));
+
 // 🔍 浮動按鈕:結果頁很長,捲到深處時給一鍵回到輸入區——「再測一檔」的門檻越低,黏著度越高
 window.addEventListener('scroll', () => {
   $('fab').style.display = (window.scrollY > 700 && $('results').style.display !== 'none') ? 'block' : 'none';
@@ -2797,6 +2811,7 @@ async function renderAiInsight(stockId, name){
     box.innerHTML = `<div style="margin-bottom:2px;">${pills}</div>` + newsHtml + dayHtml + chartHtml
       + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`;
     try{ if(ckObj) drawKChart($('kchart'), s.slice(-45), ckObj); }catch(e){}
+    scrollToRes();   // AI 卡把頁面撐高了,重新對準結果區
   }catch(e){ card.style.display = 'none'; /* 解析失敗就收起,不影響主回測 */ }
 }
 
@@ -3033,10 +3048,17 @@ async function run(auto){
     }catch(e){}
     // 手動回測(或點分享連結進站)後自動捲到結果,手機使用者不會停在表單傻等
     // (必須在 display:block 之後才捲得動;延遲一拍等圖表排版完成,位置才準)
-    if(!isAuto || window.FROM_SHARE) setTimeout(() => {
-      const y = $('resTitle').getBoundingClientRect().top + window.pageYOffset - 8;
-      window.scrollTo({top: y, behavior: 'smooth'});
-    }, 120);
+    if(!isAuto || window.FROM_SHARE){
+      scrollLockUntil = Date.now() + 3500;
+      setTimeout(() => {
+        const y = $('resTitle').getBoundingClientRect().top + window.pageYOffset - 8;
+        window.scrollTo({top: y, behavior: 'smooth'});
+      }, 120);
+      // 背景內容陸續完成會推移頁面,分三次重新對準(使用者一動手就停)
+      setTimeout(scrollToRes, 1200);
+      setTimeout(scrollToRes, 2300);
+      setTimeout(scrollToRes, 3400);
+    }
     window.FROM_SHARE = false;
   }catch(e){
     status.className='error';
