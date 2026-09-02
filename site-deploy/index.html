@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-Q|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-R|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-Q';
+const APP_VER = 'v20260902-R';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -3129,11 +3129,11 @@ async function renderAiInsight(stockId, name){
             if(nearHi){ tone = `🚨 <b>已貼近它自己的前波高倍數(${peHi.toFixed(1)} 倍)</b>——不管這個族群天花板多高多低,這裡就是它歷史上市場願意出的最高價碼;要再上去,得靠獲利上修,不能只靠估值想像——追價風險此刻最大`; tc = 'var(--red)'; }
             else if(pe >= 25){ tone = `🔶 <b>高於台積電基準(約 25 倍)</b>——但它前波高曾到 ${peHi.toFixed(1)} 倍,市場對這個族群本來就願意給更高的價碼;貴,但還沒到它自己的天花板——劇本要持續兌現,估值才撐得住`; tc = '#ffd23f'; }
             else if(pe >= 19){ tone = `⚖️ <b>台積電基準區(19~25 倍)</b>——跟獲利怪物差不多的價碼,不貴不便宜;漲跌回歸籌碼與獲利動能,估值不是這檔現在的主角`; tc = 'var(--gold)'; }
-            else { tone = `🟢 <b>19 倍以內</b>——估值在便宜區;但便宜通常有它的理由(成長性、景氣循環、市場信心),配合上方五燈一起看,別單看便宜就進場`; tc = 'var(--green)'; }
+            else { tone = `🟢 <b>19 倍以內——比台積電(市場基準,約 25 倍)還便宜</b>:連獲利最強的公司都賣 25 倍,這檔卻只要 ${pe.toFixed(1)} 倍,估值在便宜區;但便宜通常有它的理由(成長性、景氣循環、市場信心),配合上方五燈一起看,別單看便宜就進場`; tc = 'var(--green)'; }
             peHtml = `<div style="${subBox} margin-top:12px;">`
               + `<p style="font-weight:700; margin:0 0 8px; color:var(--gold);">💰 本益比體檢(財報自動抓取)</p>`
               + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">今年${qLabel} EPS <b>${ytd.toFixed(2)} 元</b> → 年化約 <b>${ann.toFixed(2)} 元</b>${ttm != null ? `|近四季合計 ${ttm.toFixed(2)} 元` : ''}</p>`
-              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">現價 ${fmt(lastC)} ÷ 年化 EPS = <b style="color:${tc}; font-size:1.05rem;">${pe.toFixed(1)} 倍</b>${ttm > 0 ? `(用近四季 EPS 算約 ${(lastC / ttm).toFixed(1)} 倍)` : ''}</p>`
+              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">現價 ${fmt(lastC)} ÷ 年化 EPS = <b style="color:${tc}; font-size:1.05rem;">${pe.toFixed(1)} 倍</b></p>`
               + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">近 8 個月:最高 ${fmt(hi2)}(約 <b>${peHi.toFixed(1)} 倍</b>)|最低 ${fmt(lo3)}(約 <b>${peLo.toFixed(1)} 倍</b>)——目前落在區間 <b>${pos.toFixed(0)}%</b> 的位置</p>`
               + `<p style="margin:8px 0 0; line-height:1.8; font-size:.95rem; color:${tc};">${tone}</p>`
               + `<p class="hint" style="margin-top:8px;">依公開財報自動計算;年化=已公布季數推估、不含未來預測;歷史倍數區間僅為事實紀錄,非目標價、不構成任何價位預測。財報是落後資訊,市場永遠在給「未來」定價。</p></div>`;
