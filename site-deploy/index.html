@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-I|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-H';
+const APP_VER = 'v20260902-I';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2539,15 +2539,23 @@ function taChecklist(s, instNet){
     const lo0 = s[k].min;
     if(lo0 <= s[k-1].min && lo0 <= s[k-2].min && lo0 <= s[k+1].min && (k + 2 >= n || lo0 <= s[k+2].min)){ trailLow = lo0; break; }
   }
-  let trailing = false;
+  let trailing = false, farNote = '';
   if(trend === '多頭'){
     const cand = [trailLow, ma20, lastLow].filter(v => v > 0 && v < last.close);
     if(cand.length){ const up2 = Math.max(...cand); if(up2 > lastLow){ lastLow = up2; trailing = true; } }
+  }else if(lastLow > 0 && lastLow < last.close * 0.88){
+    // 🛡 遠底防呆:前波確認底距現價 >12%,拿它當防守=實質不設防(分割股、急漲急跌股常見)
+    // 不論趨勢標籤,改用「近期回檔低點/月線」中低於現價的較高者當實務防守
+    const cand = [trailLow, ma20].filter(v => v > 0 && v < last.close);
+    if(cand.length){
+      const up2 = Math.max(...cand);
+      if(up2 > lastLow){ farNote = `;結構上的前波底 ${fmt(lastLow)} 距現價超過 12%,拿它當防守形同不設防——改用實務防守`; lastLow = up2; trailing = true; }
+    }
   }
   const recentLow = Math.min(...s.slice(-6, -1).map(b => b.min));
   const shortNote = (trend !== '空頭' && recentLow > lastLow * 1.02) ? `;短線想守緊一點,可用近日回檔低點 ${fmt(recentLow)}` : '';
   const stop = trailing
-    ? `多頭移動防守=前一個回檔底/月線之較高者 ${fmt(lastLow)}(月線 ${fmt(ma20)})——趨勢延伸,防守跟著墊高;跌破就出場或大減碼,停利可以提早、停損不能商量${shortNote}`
+    ? `${farNote ? '實務' : '多頭移動'}防守=前一個回檔底/月線之較高者 ${fmt(lastLow)}(月線 ${fmt(ma20)})——${farNote ? farNote.slice(1) : '趨勢延伸,防守跟著墊高'};跌破就出場或大減碼,停利可以提早、停損不能商量${shortNote}`
     : (lastLow === neckTop && neckTop > lastLowC)
     ? `多方防守=前高轉支撐 ${fmt(neckTop)} 與月線 ${fmt(ma20)}——突破後回測不破=突破有效的二次確認;跌破就出場,不攤平${shortNote}`
     : `多方常用防守位=前波低點 ${fmt(lastLow)} 與月線 ${fmt(ma20)}——順勢規則:跌破買進依據的低點就無條件出場、不攤平、不延後${shortNote}`;
