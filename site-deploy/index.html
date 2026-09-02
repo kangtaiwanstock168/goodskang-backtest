@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-C|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-B';
+const APP_VER = 'v20260902-C';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1810,6 +1810,90 @@ function scrollToRes(){
 }
 ['wheel', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, () => { scrollLockUntil = 0; }, {passive: true}));
 
+// 🔥 做功課連續天數:每天至少跑一次分析就延續;週五→週一視為連續(市場也休息)
+function bumpStreak(){
+  try{
+    const t = new Date(), pz = n => String(n).padStart(2, '0');
+    const td = `${t.getFullYear()}-${pz(t.getMonth() + 1)}-${pz(t.getDate())}`;
+    const st = JSON.parse(localStorage.getItem('kstreak') || '{"d":"","n":0}');
+    if(st.d === td) return st.n;
+    const gap = st.d ? Math.round((new Date(td) - new Date(st.d)) / 86400000) : 99;
+    const dowPrev = st.d ? new Date(st.d).getDay() : -1;
+    st.n = (gap === 1 || (gap <= 3 && dowPrev === 5) || (gap === 2 && t.getDay() === 1)) ? st.n + 1 : 1;
+    st.d = td;
+    localStorage.setItem('kstreak', JSON.stringify(st));
+    if(st.n >= 3) track('streak', {days: st.n});
+    return st.n;
+  }catch(e){ return 0; }
+}
+
+// 📸 限動分享圖卡:把五燈檢查表+標註K線畫成 1080×1920 直式圖,手機直接分享、電腦下載
+async function makeShareCard(){
+  const d = window.__cardD;
+  if(!d) return;
+  const strip = t => String(t || '').replace(/<[^>]*>/g, '');
+  const W = 1080, H = 1920, cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const x = cv.getContext('2d');
+  const wrap = (txt, mw) => { const out = []; let ln = ''; for(const ch of txt){ if(x.measureText(ln + ch).width > mw){ out.push(ln); ln = ch; } else ln += ch; } if(ln) out.push(ln); return out; };
+  x.fillStyle = '#0d1117'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#d29922'; x.fillRect(0, 0, W, 8);
+  x.textAlign = 'center';
+  x.fillStyle = '#d29922'; x.font = 'bold 54px "Noto Sans TC",sans-serif'; x.fillText('📈 阿康的台股 AI 作戰室', W / 2, 112);
+  x.fillStyle = '#8b949e'; x.font = '34px "Noto Sans TC",sans-serif'; x.fillText(`${d.date}・順勢技術檢查表(${d.score}/${d.nItems} 綠燈)`, W / 2, 172);
+  x.fillStyle = '#e6edf3'; x.font = 'bold 86px "Noto Sans TC",sans-serif'; x.fillText(`${d.nm} ${d.id}`, W / 2, 296);
+  x.fillStyle = d.pct >= 0 ? '#f85149' : '#3fb950';
+  x.font = 'bold 62px "Noto Sans TC",sans-serif'; x.fillText(`${d.price}  ${d.pct >= 0 ? '+' : ''}${d.pct.toFixed(2)}%`, W / 2, 386);
+  let y0 = 430;
+  const kc = document.getElementById('kchart');
+  if(kc && kc.width > 0){
+    const kw = 1000, kh = Math.min(560, Math.round(kc.height * kw / kc.width));
+    x.fillStyle = '#161b22'; x.fillRect(30, y0 - 10, kw + 20, kh + 20);
+    x.drawImage(kc, 40, y0, kw, kh);
+    y0 += kh + 50;
+  }
+  x.textAlign = 'left';
+  // 綜合判定框
+  x.font = 'bold 40px "Noto Sans TC",sans-serif';
+  const vLines = wrap(strip(d.verdict), 940).slice(0, 3);
+  const vh = vLines.length * 56 + 36;
+  x.strokeStyle = '#d29922'; x.lineWidth = 3; x.fillStyle = 'rgba(210,153,34,.09)';
+  x.fillRect(40, y0, 1000, vh); x.strokeRect(40, y0, 1000, vh);
+  x.fillStyle = '#d29922';
+  vLines.forEach((ln, i) => x.fillText(ln, 70, y0 + 62 + i * 56));
+  y0 += vh + 44;
+  // 五燈逐項(短版)
+  x.font = '38px "Noto Sans TC",sans-serif';
+  for(const it of d.items.slice(0, 5)){
+    const short = strip(it.txt).split(/[,;(——]/)[0].slice(0, 20);
+    x.fillStyle = '#e6edf3';
+    x.fillText(`${it.icon} ${it.name}`, 60, y0);
+    x.fillStyle = '#8b949e';
+    x.fillText(short, 340, y0);
+    y0 += 62;
+  }
+  y0 += 10;
+  x.fillStyle = '#58a6ff'; x.font = 'bold 38px "Noto Sans TC",sans-serif';
+  x.fillText(`🛡 防守參考:${d.stop ? Number(d.stop).toLocaleString('zh-TW') : '—'}`, 60, y0);
+  // 頁尾
+  x.textAlign = 'center';
+  x.fillStyle = '#8b949e'; x.font = '30px "Noto Sans TC",sans-serif';
+  x.fillText('依公開資料自動產生・僅描述現狀、非投資建議・盈虧自負', W / 2, H - 130);
+  x.fillStyle = '#d29922'; x.font = 'bold 42px "Noto Sans TC",sans-serif';
+  x.fillText('goodskangtaiwanstock.netlify.app', W / 2, H - 62);
+  track('share_card', {stock: d.id});
+  cv.toBlob(async b => {
+    if(!b) return;
+    const f = new File([b], `akang_${d.id}_${d.date}.png`, {type: 'image/png'});
+    if(navigator.canShare && navigator.canShare({files: [f]})){
+      try{ await navigator.share({files: [f], title: `${d.nm} 五燈檢查表`}); return; }catch(e){ if(e && e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = f.name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }, 'image/png');
+}
+
 // 🔍 浮動按鈕:結果頁很長,捲到深處時給一鍵回到輸入區——「再測一檔」的門檻越低,黏著度越高
 window.addEventListener('scroll', () => {
   $('fab').style.display = (window.scrollY > 700 && $('results').style.display !== 'none') ? 'block' : 'none';
@@ -2758,8 +2842,17 @@ async function renderAiInsight(stockId, name){
         localStorage.setItem('sigLog', JSON.stringify(log));
       }
     }catch(e){}
+    // 📸 分享圖卡資料:存下當前判讀,按鈕按下時照這份畫圖
+    try{
+      const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
+      window.__cardD = ckObj ? {id: stockId, nm: nameOf(stockId), date: end, price: fmt(lastC),
+        pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
+        stop: ckObj.lastLow, score: ckObj.score, nItems: ckObj.nItems} : null;
+    }catch(e){ window.__cardD = null; }
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
+    const stkN = bumpStreak();
+    if(stkN >= 2) pills += `<span class="pill">🔥 連續做功課 <b style="color:var(--gold);">${stkN} 天</b></span>`;
     if(relDiff != null) pills += `<span class="pill">對大盤 ${Math.abs(relDiff) < 1
       ? `<b style="color:var(--gold);">同步 ${pct(Math.abs(relDiff)).replace('+','')}</b>`
       : `<b class="${cls(relDiff)}">${relDiff >= 0 ? '強' : '弱'} ${pct(Math.abs(relDiff)).replace('+','')}</b>`}</span>`;
@@ -2793,6 +2886,7 @@ async function renderAiInsight(stockId, name){
         + `<p style="margin:0 0 10px; padding:9px 12px; border-radius:8px; font-weight:700; border:1px solid ${bc}; background:${bg}; line-height:1.7;">${ckObj.verdict}</p>`
         + ckObj.items.map(x => `<p style="margin:6px 0; line-height:1.7; font-size:.95rem;">${x.icon} <b>${x.name}:</b>${x.txt}</p>`).join('')
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🛡 <b>防守參考:</b>${ckObj.stop}</p>`
+        + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 產生限動分享圖卡</button>`
         + `<p class="hint" style="margin-top:8px;">依經典順勢規則自動比對日K,僅描述現狀、非投資建議;當沖損益放大,風險自負。</p></div>`;
     }
     // ⚡ 盤中動能(當沖視角):跳空/VWAP 位置/距高點回落/漲停偵測——日K規則管環境,這裡管「今天盤面的即時姿態」
