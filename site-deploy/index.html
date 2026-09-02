@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-L|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-M|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-L';
+const APP_VER = 'v20260902-M';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2308,8 +2308,20 @@ async function renderTopic(){
         if(r.ok) j = await r.json();
       }catch(e){}
     }
-    const top = (j && j.top) || [];
-    if(top.length < 3) return;
+    let top = (j && j.top) || [];
+    let fromCache = false;
+    if(top.length >= 3){
+      try{ localStorage.setItem('topicCache', JSON.stringify({t: Date.now(), j})); }catch(e){}
+    }else{
+      // 抓不到(部署後函式冷啟動/FinMind 限流)就用上次快取撐場(≤4小時),90 秒後背景重試
+      // ——這區是門面,寧可先給舊資料也不能整區開天窗
+      try{
+        const ca = JSON.parse(localStorage.getItem('topicCache') || 'null');
+        if(ca && Date.now() - ca.t < 4 * 3600 * 1000 && ca.j && (ca.j.top || []).length >= 3){ j = ca.j; top = j.top; fromCache = true; }
+      }catch(e){}
+      setTimeout(() => { try{ renderTopic(); }catch(e){} }, 90000);
+      if(top.length < 3) return;
+    }
     // 等股名清單載入(最多 3 秒),沒有就顯示代號
     for(let w = 0; w < 10 && !stockList; w++) await new Promise(rs => setTimeout(rs, 300));
     const nameOf = id => { const hit = (stockList || []).find(s2 => s2.id === id); return hit ? hit.name : id; };
@@ -2354,7 +2366,7 @@ async function renderTopic(){
     // 首屏開胃菜:電腦 5 張、手機 6 張——別把輸入框推出視野;其餘的放「更多話題股」補到 15
     const topN = window.innerWidth <= 640 ? 6 : 5;
     box.innerHTML = top.slice(0, topN).map(mkCard).join('');
-    $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——完整前 15 名在下方「更多話題股」。`;
+    $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——完整前 15 名在下方「更多話題股」。${fromCache ? '|📡 目前為快取資料,背景更新中' : ''}`;
     card.style.display = 'block';
     const rest = top.slice(topN);
     if(rest.length && $('topic2Box')){
