@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-I|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-K|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-I';
+const APP_VER = 'v20260902-K';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1966,15 +1966,34 @@ async function makeShareCard(){
   x.fillStyle = '#d29922'; x.font = 'bold ' + F(42);
   x.fillText('goodskangtaiwanstock.netlify.app', W / 2, H - 60);
   track('share_card', {stock: d.id});
-  cv.toBlob(async b => {
+  // 📲 預覽彈窗:長按存圖(iOS 最短路徑)+一鍵喚起 IG 限動相機——比系統分享面板少兩步
+  cv.toBlob(b => {
     if(!b) return;
-    const f = new File([b], `akang_${d.id}_${d.date}.png`, {type: 'image/png'});
-    if(navigator.canShare && navigator.canShare({files: [f]})){
-      try{ await navigator.share({files: [f], title: `${d.nm} 回測戰績`}); return; }catch(e){ if(e && e.name === 'AbortError') return; }
-    }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(b); a.download = f.name; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    const url = URL.createObjectURL(b);
+    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    const old = document.getElementById('cardModal');
+    if(old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'cardModal';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.88); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; overflow:auto;';
+    const btnCss = 'display:block; width:min(320px,86vw); margin:5px auto; padding:12px; border-radius:10px; font-weight:700; font-size:1rem; text-align:center; cursor:pointer; border:none; text-decoration:none;';
+    ov.innerHTML = `
+      <img src="${url}" style="max-height:56vh; max-width:88vw; border-radius:14px; box-shadow:0 8px 40px rgba(0,0,0,.6);" alt="回測戰績卡">
+      <p style="color:#e6edf3; font-size:.92rem; margin:12px 0 8px; text-align:center; line-height:1.6;">${isMobile ? '① <b>長按上圖 → 儲存影像</b>(存進相簿)<br>② 按下面按鈕開 IG 限動,左下角相簿選它' : '圖卡已生成——下載後上傳到 IG 限動'}</p>
+      ${isMobile ? `<a href="instagram://story-camera" style="${btnCss} background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); color:#fff;">📸 打開 IG 限動相機</a>` : ''}
+      <button id="cardSaveBtn" style="${btnCss} background:rgba(210,153,34,.15); color:var(--gold); border:1px solid var(--gold);">💾 ${isMobile ? '或用系統分享/儲存' : '下載圖卡 PNG'}</button>
+      <button id="cardCloseBtn" style="${btnCss} background:none; color:#8b949e; border:1px solid #30363d;">關閉</button>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', ev => { if(ev.target === ov) ov.remove(); });
+    document.getElementById('cardCloseBtn').onclick = () => { ov.remove(); URL.revokeObjectURL(url); };
+    document.getElementById('cardSaveBtn').onclick = async () => {
+      const f = new File([b], `akang_${d.id}_${d.date}.png`, {type: 'image/png'});
+      if(navigator.canShare && navigator.canShare({files: [f]})){
+        try{ await navigator.share({files: [f], title: `${d.nm} 回測戰績`}); return; }catch(e){ if(e && e.name === 'AbortError') return; }
+      }
+      const a = document.createElement('a');
+      a.href = url; a.download = f.name; a.click();
+    };
   }, 'image/png');
 }
 
@@ -2207,6 +2226,7 @@ async function renderWatchBoard(){
     if(!watchDaily.length) return;
     await refreshWatchBoard();
     track('watch_board', {n: watchDaily.length, live: isMktOpen() ? 1 : 0, def: watchIsDefault ? 1 : 0});
+    scrollToRes();   // 這塊長在結果區上方,長完重新對準
     // 盤中每 60 秒自動刷新(只抓 Yahoo 即時價,不重打歷史資料);收盤那一刻自動切回收盤模式
     if(isMktOpen() && !watchTimer) watchTimer = setInterval(() => {
       refreshWatchBoard();
@@ -2271,6 +2291,7 @@ async function renderRadar(){
     if(window.SCAN_DATE) $('radarHint').innerHTML = `⏰ <b style="color:var(--gold);">上市資料日:${window.SCAN_DATE}</b>|` + $('radarHint').innerHTML;
     card.style.display = 'block';
     track('radar', {n: hot.length});
+    scrollToRes();   // 這塊長在結果區上方,長完重新對準
   }catch(e){}
 }
 
@@ -2341,6 +2362,7 @@ async function renderTopic(){
       $('topic2Card').style.display = 'block';
     }
     track('topic', {n: top.length});
+    scrollToRes();   // 這塊長在結果區上方,長完重新對準
   }catch(e){}
 }
 
@@ -2545,16 +2567,23 @@ function taChecklist(s, instNet){
     if(cand.length){ const up2 = Math.max(...cand); if(up2 > lastLow){ lastLow = up2; trailing = true; } }
   }else if(lastLow > 0 && lastLow < last.close * 0.88){
     // 🛡 遠底防呆:前波確認底距現價 >12%,拿它當防守=實質不設防(分割股、急漲急跌股常見)
-    // 不論趨勢標籤,改用「近期回檔低點/月線」中低於現價的較高者當實務防守
-    const cand = [trailLow, ma20].filter(v => v > 0 && v < last.close);
+    // 不論趨勢標籤,改用「近期回檔低點/月線/近10日低點」中低於現價的較高者當實務防守
+    // (陰跌盤沒有標準 ±2 微底、月線又在頭上時,近10日低點是最後的保底候選)
+    const r10 = s.length >= 12 ? Math.min(...s.slice(-11, -1).map(b2 => b2.min)) : 0;
+    const cand = [trailLow, ma20, r10].filter(v => v > 0 && v < last.close);
     if(cand.length){
       const up2 = Math.max(...cand);
       if(up2 > lastLow){ farNote = `;結構上的前波底 ${fmt(lastLow)} 距現價超過 12%,拿它當防守形同不設防——改用實務防守`; lastLow = up2; trailing = true; }
+    }else{
+      // 近期低點全在現價之上=正在破底——不硬給假防守,直接把危險講明白
+      farNote = 'BREAK';
     }
   }
   const recentLow = Math.min(...s.slice(-6, -1).map(b => b.min));
   const shortNote = (trend !== '空頭' && recentLow > lastLow * 1.02) ? `;短線想守緊一點,可用近日回檔低點 ${fmt(recentLow)}` : '';
-  const stop = trailing
+  const stop = farNote === 'BREAK'
+    ? `⚠️ <b>現價 ${fmt(last.close)} 已跌破近期所有低點</b>(近10日低、微回檔底都在現價之上)——正在破底,近距離沒有任何支撐;下一個結構支撐遠在 <b>${fmt(lastLow)}</b>(約 -${((last.close - lastLow) / last.close * 100).toFixed(0)}%)。這種位置做多形同沒有防守——順勢規則的答案:空手不進場,持有者依自己的停損紀律處理,不凹單`
+    : trailing
     ? `${farNote ? '實務' : '多頭移動'}防守=前一個回檔底/月線之較高者 ${fmt(lastLow)}(月線 ${fmt(ma20)})——${farNote ? farNote.slice(1) : '趨勢延伸,防守跟著墊高'};跌破就出場或大減碼,停利可以提早、停損不能商量${shortNote}`
     : (lastLow === neckTop && neckTop > lastLowC)
     ? `多方防守=前高轉支撐 ${fmt(neckTop)} 與月線 ${fmt(ma20)}——突破後回測不破=突破有效的二次確認;跌破就出場,不攤平${shortNote}`
@@ -2576,7 +2605,7 @@ function taChecklist(s, instNet){
     : phase === '作頭'
     ? `🚦 綜合:日K出現<b class="down">作頭疑慮</b>(${score}/${nItems} 綠燈)——反彈不追,短線做多先縮手;跌破 <b>${fmt(lastLow)}</b> 轉空確認。`
     : `🚦 綜合:日K環境<b style="color:var(--gold);">中性</b>(${score}/${nItems} 綠燈)——訊號不齊,短線寧可少做,等綠燈變多。`;
-  return {items, score, nItems, stop, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n};
+  return {items, score, nItems, stop, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK'};
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
@@ -2972,7 +3001,9 @@ async function renderAiInsight(stockId, name){
         : ckObj.verdict.includes('作頭') ? '<b class="down">警戒 🟠</b>'
         : '<b style="color:var(--gold);">中性 🟡</b>';
       pills += `<span class="pill">短線環境 ${light}</span>`;
-      pills += `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ckObj.lastLow)}</b></span>`;
+      pills += ckObj.breakdown
+        ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>`
+        : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ckObj.lastLow)}</b></span>`;
     }
     // ② K 線圖(永遠可見,圖就是最好的語言)
     const chartHtml = ckObj
@@ -3288,15 +3319,15 @@ async function run(auto){
     // 手動回測(或點分享連結進站)後自動捲到結果,手機使用者不會停在表單傻等
     // (必須在 display:block 之後才捲得動;延遲一拍等圖表排版完成,位置才準)
     if(!isAuto || window.FROM_SHARE){
-      scrollLockUntil = Date.now() + 3500;
+      // 分享連結進站是冷啟動:雷達/話題/觀察站要 5~10 秒才長完,對準窗要拉長到 9 秒
+      const lockMs = window.FROM_SHARE ? 9000 : 3500;
+      scrollLockUntil = Date.now() + lockMs;
       setTimeout(() => {
         const y = $('resTitle').getBoundingClientRect().top + window.pageYOffset - 8;
         window.scrollTo({top: y, behavior: 'smooth'});
       }, 120);
-      // 背景內容陸續完成會推移頁面,分三次重新對準(使用者一動手就停)
-      setTimeout(scrollToRes, 1200);
-      setTimeout(scrollToRes, 2300);
-      setTimeout(scrollToRes, 3400);
+      // 背景內容陸續完成會推移頁面,多次重新對準(使用者一動手就停)
+      [1200, 2300, 3400, 5000, 6800, 8800].forEach(t2 => setTimeout(scrollToRes, t2));
     }
     window.FROM_SHARE = false;
   }catch(e){
