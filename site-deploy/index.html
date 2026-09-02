@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260901-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260901-B';
+const APP_VER = 'v20260902-B';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1891,7 +1891,9 @@ function spark(series, base, colorVar){
 
 // 📊 我的觀察站:回訪者開站直接看到自己股票的最新狀態——散戶每天本來就要看盤,把「看一眼」的理由留在這裡
 // 盤中(週一到五 09:00-13:35):即時價+今日分時線,每 60 秒自動刷新;收盤後:收盤結算+近月趨勢線
-function isMktOpen(){ const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); return n.getDay() >= 1 && n.getDay() <= 5 && m >= 540 && m <= 815; }
+// 台股一天三個階段:live=盤中撮合(9:00–13:29,量能只能推估)/ fixing=盤後定價時段(13:30–14:30,收盤價量已定案,14:00–14:30 可掛定價單)/ closed=其餘時間
+function mktPhase(){ const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); if(n.getDay() < 1 || n.getDay() > 5) return 'closed'; if(m >= 540 && m < 810) return 'live'; if(m >= 810 && m < 870) return 'fixing'; return 'closed'; }
+function isMktOpen(){ return mktPhase() === 'live'; }
 // 用 var:觀察站在頁面載入當下就會執行,var 會提升宣告,避免撞上 let 的暫時性死區
 var watchDaily = null, watchTimer = null, watchIsDefault = false;
 
@@ -2301,12 +2303,28 @@ function taChecklist(s, instNet){
     const lots = v => Math.round(v / 1000).toLocaleString('zh-TW');
     const nowLots = last.rawVol > 0 ? lots(last.rawVol) : '—';
     const projLots = lots(last.Trading_Volume), avgLots = lots(v5);
-    const head = `⏳ <b>尚未收盤(${last.atTime || '盤中'})</b>:目前累積成交 <b>${nowLots} 張</b>|5 日均量 <b>${avgLots} 張</b>|照這個速度收盤約 <b>${projLots} 張(${volX.toFixed(1)} 倍均量)</b>`;
-    if(last.elapsed && last.elapsed < 90){
-      vIcon = '⚠️';
-      vTxt = head + `<br>👉 開盤未滿 90 分鐘,推估會大幅跳動,<b>先看數字就好,10:30 後再判讀量價</b>`;
+    if(last.fixed){
+      // 13:30 之後:量價已是全日定案數字,判定是「確定」不是「推估」
+      const head = `✅ <b>今日已收盤(13:30 定價 ${fmt(last.close)})</b>:全日成交 <b>${nowLots} 張</b>|5 日均量 <b>${avgLots} 張</b>|<b>${volX.toFixed(1)} 倍均量</b>——數字已定案,非推估`;
+      let tail;
+      if(last.fixed === 1){
+        tail = `<br>🕐 <b>現在是盤後定價時段(14:00–14:30 以收盤價撮合)</b>——上面的量價判定用的就是最終數字,定價單參考的是同一個收盤價`;
+      }else if(last.afFix > 0 || last.afOdd > 0){
+        // 做功課模式:盤中+盤後定價+零股=全日真量(倍數判定仍用盤中量,和 5 日均量同一基準才公平)
+        const af = last.afFix || 0, ao = last.afOdd || 0, tot = last.rawVol + af + ao;
+        tail = `<br>🌙 <b>做功課版全日真量</b>:盤中 ${lots(last.rawVol)} 張+盤後定價 ${lots(af)} 張+零股 ${ao >= 1000 ? lots(ao) + ' 張' : ao.toLocaleString('zh-TW') + ' 股'}=<b>${lots(tot)} 張</b>(上方倍數以盤中量對 5 日均量計算,基準一致)`;
+      }else{
+        tail = `<br>🌙 收盤定案版——適合今晚做功課、明早開盤前對照(盤後定價/零股量約 14:30 後併入)`;
+      }
+      vTxt = `${head}<br>👉 ${vTxt}${tail}`;
     }else{
-      vTxt = head + `<br>👉 ${vTxt}(收盤才算數)`;
+      const head = `⏳ <b>尚未收盤(${last.atTime || '盤中'})</b>:目前累積成交 <b>${nowLots} 張</b>|5 日均量 <b>${avgLots} 張</b>|照這個速度收盤約 <b>${projLots} 張(${volX.toFixed(1)} 倍均量)</b>`;
+      if(last.elapsed && last.elapsed < 90){
+        vIcon = '⚠️';
+        vTxt = head + `<br>👉 開盤未滿 90 分鐘,推估會大幅跳動,<b>先看數字就好,10:30 後再判讀量價</b>`;
+      }else{
+        vTxt = head + `<br>👉 ${vTxt}(收盤才算數)`;
+      }
     }
   }
   items.push({icon: vIcon, name: '量價', txt: vTxt});
@@ -2559,10 +2577,21 @@ async function renderAiInsight(stockId, name){
             }
           }
           liveElapsed = elapsed;
-          const vProj = (lv.vol > 0 && frac > 0.05) ? Math.round(lv.vol / frac) : 0;
+          // 13:30 撮合結束後,量已是全日定案——不再推估,fixed 標記讓下游改用「已收盤」措辭
+          const ph = mktPhase();
+          const fixed = ph === 'fixing' ? 1 : (ph === 'closed' ? 2 : 0);
+          const vProj = fixed ? lv.vol : ((lv.vol > 0 && frac > 0.05) ? Math.round(lv.vol / frac) : 0);
           const hhmm = `${p2(nowT.getHours())}:${p2(nowT.getMinutes())}`;
-          s.push({date: end, open: lv.o > 0 ? lv.o : lv.p, max: lv.h > 0 ? lv.h : lv.p, min: lv.l > 0 ? lv.l : lv.p, close: lv.p,
-                  Trading_Volume: vProj, live: true, elapsed, frac, rawVol: lv.vol, atTime: hhmm});
+          const nb = {date: end, open: lv.o > 0 ? lv.o : lv.p, max: lv.h > 0 ? lv.h : lv.p, min: lv.l > 0 ? lv.l : lv.p, close: lv.p,
+                  Trading_Volume: vProj, live: true, fixed, elapsed, frac, rawVol: lv.vol, atTime: hhmm};
+          // 14:30 後:補抓盤後定價+零股成交,拼出「全日真量」(表約 14:30 後發布,單位=股)
+          if(fixed === 2){
+            try{
+              const aj = await (await fetch('/.netlify/functions/after?id=' + stockId)).json();
+              if(aj && aj.d === end && (aj.fix > 0 || aj.odd > 0)){ nb.afFix = aj.fix; nb.afOdd = aj.odd; }
+            }catch(e){}
+          }
+          s.push(nb);
           liveBar = true;
         }
       }
@@ -2663,7 +2692,7 @@ async function renderAiInsight(stockId, name){
         ? `量縮 <b>${Math.abs(vChg).toFixed(0)}%</b> 下跌,殺盤力道趨緩,但也代表還沒人想伸手`
         : `價格沒動、量能卻退潮 <b>${Math.abs(vChg).toFixed(0)}%</b>——市場在觀望,通常要等量重新回來才有行情`;
       const lastV = volBars[volBars.length-1];
-      if(lastV.Trading_Volume >= 1.8 * v5) volTxt += `;另外 ${md(lastV.date)} 爆出 5 日均量 ${(lastV.Trading_Volume / v5).toFixed(1)} 倍的大量${lastV.live ? '(<b>盤中推估,收盤才算數</b>)' : '——有大部位在動作,後續幾天值得盯'}`;
+      if(lastV.Trading_Volume >= 1.8 * v5) volTxt += `;另外 ${md(lastV.date)} 爆出 5 日均量 ${(lastV.Trading_Volume / v5).toFixed(1)} 倍的大量${(lastV.live && !lastV.fixed) ? '(<b>盤中推估,收盤才算數</b>)' : '——有大部位在動作,後續幾天值得盯'}`;
       bullets.push(volTxt + '。');
     }
 
@@ -2748,7 +2777,7 @@ async function renderAiInsight(stockId, name){
     // ② K 線圖(永遠可見,圖就是最好的語言)
     const chartHtml = ckObj
       ? `<div style="background:#0d1117; border:1px solid var(--border); border-radius:10px; padding:8px 4px; margin-top:6px;"><canvas id="kchart"></canvas></div>`
-        + `<p class="hint" style="margin:4px 0 0;">近 45 日K線|金線=月線|<span style="color:#39c5cf;">青線=季線(60MA)</span>|🔴🟢圈=頭/底轉折|藍虛線=防守位|下欄=成交量(張),金線=5日均量|「今」=${liveBar ? (isMktOpen() ? '<b style="color:var(--red);">今日盤中即時(未收盤)</b>' : '今日收盤(即時源)') : '最新一根'}</p>`
+        + `<p class="hint" style="margin:4px 0 0;">近 45 日K線|金線=月線|<span style="color:#39c5cf;">青線=季線(60MA)</span>|🔴🟢圈=頭/底轉折|藍虛線=防守位|下欄=成交量(張),金線=5日均量|「今」=${liveBar ? (isMktOpen() ? '<b style="color:var(--red);">今日盤中即時(未收盤)</b>' : '<b style="color:var(--gold);">今日收盤定案(13:30)</b>') : '最新一根'}</p>`
       : '';
     // ③ 儀表板雙欄:白話解讀(左)+順勢檢查表(右),電腦並排、手機堆疊,全部攤開不用點
     const subBox = 'background:rgba(88,166,255,.03); border:1px solid var(--border); border-radius:10px; padding:12px 14px;';
@@ -2768,7 +2797,7 @@ async function renderAiInsight(stockId, name){
     }
     // ⚡ 盤中動能(當沖視角):跳空/VWAP 位置/距高點回落/漲停偵測——日K規則管環境,這裡管「今天盤面的即時姿態」
     let dayHtml = '';
-    if(liveBar && lvInfo && isMktOpen() && s.length >= 2){
+    if(liveBar && lvInfo && (isMktOpen() || mktPhase() === 'fixing') && s.length >= 2){
       const pvClose = s[s.length-2].close;
       const rows = [];
       if(lvInfo.o > 0){
@@ -2788,7 +2817,7 @@ async function renderAiInsight(stockId, name){
       if(dnLimit) rows.push(`🔒 <b class="down">已達/接近跌停</b>——別接,等打開再說`);
       const tNow = new Date(), p2t = n2 => String(n2).padStart(2, '0');
       dayHtml = `<div style="${subBox} border-color:rgba(248,81,73,.5); margin-top:10px;">`
-        + `<p style="font-weight:700; margin:0 0 6px; color:var(--red);">⚡ 盤中動能——當沖視角(${p2t(tNow.getHours())}:${p2t(tNow.getMinutes())} 即時)</p>`
+        + `<p style="font-weight:700; margin:0 0 6px; color:var(--red);">${isMktOpen() ? `⚡ 盤中動能——當沖視角(${p2t(tNow.getHours())}:${p2t(tNow.getMinutes())} 即時)` : `🕐 今日盤面總結——收盤定案(盤後定價時段 14:00–14:30 以收盤價撮合)`}</p>`
         + rows.map(r2 => `<p style="margin:5px 0; line-height:1.7; font-size:.95rem;">• ${r2}</p>`).join('')
         + `<p class="hint" style="margin-top:6px;">即時姿態描述,非買賣指示;當沖請自設停損並嚴格執行。</p></div>`;
     }
