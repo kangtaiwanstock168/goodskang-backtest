@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-G|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-G';
+const APP_VER = 'v20260902-H';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2716,6 +2716,21 @@ async function renderAiInsight(stockId, name){
       }
     }catch(e){}
     let s = clean(sRaw), b = clean(bRaw);
+    // 🔧 分割/除權息還原:主回測有做、這裡以前沒做——像寶雅 1拆10 這種,不還原的話均線/漲跌/近月低點全是跨分割的垃圾數字
+    // 分割時舊成交量同步放大(股數變多),量價判讀才可比
+    let splitAdjNote = '';
+    try{
+      const evs = await fetchEvents(stockId, startL, end);
+      for(const ev of evs){
+        for(const dd of s){
+          if(dd.date < ev.date){
+            dd.close *= ev.factor; dd.open *= ev.factor; dd.max *= ev.factor; dd.min *= ev.factor;
+            if(ev.factor <= 0.5) dd.Trading_Volume = Math.round((dd.Trading_Volume || 0) / ev.factor);
+          }
+        }
+        if(ev.factor <= 0.5) splitAdjNote = `|⚠️ ${ev.date.slice(5).replace('-', '/')} 股票分割,分割前價量已還原重算`;
+      }
+    }catch(e){}
     // 收盤後即時補今日 K 棒(FinMind 通常隔天才更新)
     try{ if(s.length){ const tb = await fetchTodayBar(stockId, s[s.length-1].date, end); if(tb) s.push(tb); } }catch(e){}
     try{ if(b.length){ const tb = await fetchTodayBar('0050', b[b.length-1].date, end); if(tb) b.push(tb); } }catch(e){}
@@ -2954,7 +2969,7 @@ async function renderAiInsight(stockId, name){
     // ② K 線圖(永遠可見,圖就是最好的語言)
     const chartHtml = ckObj
       ? `<div style="background:#0d1117; border:1px solid var(--border); border-radius:10px; padding:8px 4px; margin-top:6px;"><canvas id="kchart"></canvas></div>`
-        + `<p class="hint" style="margin:4px 0 0;">近 45 日K線|金線=月線|<span style="color:#39c5cf;">青線=季線(60MA)</span>|🔴🟢圈=頭/底轉折|藍虛線=防守位|下欄=成交量(張),金線=5日均量|「今」=${liveBar ? (isMktOpen() ? '<b style="color:var(--red);">今日盤中即時(未收盤)</b>' : '<b style="color:var(--gold);">今日收盤定案(13:30)</b>') : '最新一根'}</p>`
+        + `<p class="hint" style="margin:4px 0 0;">近 45 日K線|金線=月線|<span style="color:#39c5cf;">青線=季線(60MA)</span>|🔴🟢圈=頭/底轉折|藍虛線=防守位|下欄=成交量(張),金線=5日均量|「今」=${liveBar ? (isMktOpen() ? '<b style="color:var(--red);">今日盤中即時(未收盤)</b>' : '<b style="color:var(--gold);">今日收盤定案(13:30)</b>') : '最新一根'}${splitAdjNote}</p>`
       : '';
     // ③ 儀表板雙欄:白話解讀(左)+順勢檢查表(右),電腦並排、手機堆疊,全部攤開不用點
     const subBox = 'background:rgba(88,166,255,.03); border:1px solid var(--border); border-radius:10px; padding:12px 14px;';
