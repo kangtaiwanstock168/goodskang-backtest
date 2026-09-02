@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-R|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-S|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-R';
+const APP_VER = 'v20260902-S';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2782,7 +2782,7 @@ async function renderAiInsight(stockId, name){
     // 🔧 分割/除權息還原:主回測有做、這裡以前沒做——像寶雅 1拆10 這種,不還原的話均線/漲跌/近月低點全是跨分割的垃圾數字
     // 分割時舊成交量同步放大(股數變多),量價判讀才可比
     let splitAdjNote = '';
-    window.__splitDate = '';
+    window.__splitDate = ''; window.__splitF = 0;
     try{
       const evs = await fetchEvents(stockId, startL, end);
       for(const ev of evs){
@@ -2792,7 +2792,7 @@ async function renderAiInsight(stockId, name){
             if(ev.factor <= 0.5) dd.Trading_Volume = Math.round((dd.Trading_Volume || 0) / ev.factor);
           }
         }
-        if(ev.factor <= 0.5){ splitAdjNote = `|⚠️ ${ev.date.slice(5).replace('-', '/')} 股票分割,分割前價量已還原重算`; window.__splitDate = ev.date; }
+        if(ev.factor <= 0.5){ splitAdjNote = `|⚠️ ${ev.date.slice(5).replace('-', '/')} 股票分割,分割前價量已還原重算`; window.__splitDate = ev.date; window.__splitF = ev.factor; }
       }
     }catch(e){}
     // 收盤後即時補今日 K 棒(FinMind 通常隔天才更新)
@@ -3110,6 +3110,11 @@ async function renderAiInsight(stockId, name){
       try{
       if(Array.isArray(fsRaw) && fsRaw.length){
         const eq = fsRaw.filter(r2 => r2.type === 'EPS' && isFinite(r2.value)).sort((a2, b2) => a2.date.localeCompare(b2.date));
+        // 🪓 分割還原:分割前的季度 EPS 是舊股本賺的,乘上分割係數換算到新股本基礎(寶雅 1拆10:17.45 → 1.745)
+        // 分割後公布的季度(如 Q3)本來就是新股本計,不動——新舊季相加才不會混基礎
+        if(window.__splitDate && window.__splitF > 0){
+          for(const q2 of eq) if(q2.date < window.__splitDate) q2.value = q2.value * window.__splitF;
+        }
         if(eq.length >= 2){
           const mth = +eq[eq.length - 1].date.slice(5, 7);
           const per = ({3: [1, 4], 6: [2, 2], 9: [3, 4 / 3], 12: [4, 1]})[mth] || [4, 1];
