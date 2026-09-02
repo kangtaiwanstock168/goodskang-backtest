@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-K|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260902-L|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-K';
+const APP_VER = 'v20260902-L';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2561,7 +2561,17 @@ function taChecklist(s, instNet){
     const lo0 = s[k].min;
     if(lo0 <= s[k-1].min && lo0 <= s[k-2].min && lo0 <= s[k+1].min && (k + 2 >= n || lo0 <= s[k+2].min)){ trailLow = lo0; break; }
   }
-  let trailing = false, farNote = '';
+  let trailing = false, farNote = '', splitStop = false;
+  // 🪓 分割感知:分割後是全新籌碼世界——「還原價」市場沒真正成交過,支撐記憶只存在於實際交易過的價位
+  // 防守升級成「分割後最低點」:跌破它=分割後所有買進者全數套牢,轉空確認
+  const splitD = window.__splitDate || '';
+  if(splitD){
+    const ps = s.filter(d2 => d2.date >= splitD);
+    if(ps.length >= 6){
+      const psLow = Math.min(...ps.slice(0, -1).map(d2 => d2.min));
+      if(psLow > lastLow && psLow < last.close){ lastLow = psLow; splitStop = true; }
+    }
+  }
   if(trend === '多頭'){
     const cand = [trailLow, ma20, lastLow].filter(v => v > 0 && v < last.close);
     if(cand.length){ const up2 = Math.max(...cand); if(up2 > lastLow){ lastLow = up2; trailing = true; } }
@@ -2585,6 +2595,8 @@ function taChecklist(s, instNet){
     ? `⚠️ <b>現價 ${fmt(last.close)} 已跌破近期所有低點</b>(近10日低、微回檔底都在現價之上)——正在破底,近距離沒有任何支撐;下一個結構支撐遠在 <b>${fmt(lastLow)}</b>(約 -${((last.close - lastLow) / last.close * 100).toFixed(0)}%)。這種位置做多形同沒有防守——順勢規則的答案:空手不進場,持有者依自己的停損紀律處理,不凹單`
     : trailing
     ? `${farNote ? '實務' : '多頭移動'}防守=前一個回檔底/月線之較高者 ${fmt(lastLow)}(月線 ${fmt(ma20)})——${farNote ? farNote.slice(1) : '趨勢延伸,防守跟著墊高'};跌破就出場或大減碼,停利可以提早、停損不能商量${shortNote}`
+    : splitStop
+    ? `分割後結構防守=<b>分割後最低點 ${fmt(lastLow)}</b>——分割前的還原價位市場沒有真正成交過,參考性低;分割後才是這檔的新籌碼世界,跌破分割後低點=分割後買進的人全數套牢,轉空確認、無條件出場${shortNote}`
     : (lastLow === neckTop && neckTop > lastLowC)
     ? `多方防守=前高轉支撐 ${fmt(neckTop)} 與月線 ${fmt(ma20)}——突破後回測不破=突破有效的二次確認;跌破就出場,不攤平${shortNote}`
     : `多方常用防守位=前波低點 ${fmt(lastLow)} 與月線 ${fmt(ma20)}——順勢規則:跌破買進依據的低點就無條件出場、不攤平、不延後${shortNote}`;
@@ -2756,6 +2768,7 @@ async function renderAiInsight(stockId, name){
     // 🔧 分割/除權息還原:主回測有做、這裡以前沒做——像寶雅 1拆10 這種,不還原的話均線/漲跌/近月低點全是跨分割的垃圾數字
     // 分割時舊成交量同步放大(股數變多),量價判讀才可比
     let splitAdjNote = '';
+    window.__splitDate = '';
     try{
       const evs = await fetchEvents(stockId, startL, end);
       for(const ev of evs){
@@ -2765,7 +2778,7 @@ async function renderAiInsight(stockId, name){
             if(ev.factor <= 0.5) dd.Trading_Volume = Math.round((dd.Trading_Volume || 0) / ev.factor);
           }
         }
-        if(ev.factor <= 0.5) splitAdjNote = `|⚠️ ${ev.date.slice(5).replace('-', '/')} 股票分割,分割前價量已還原重算`;
+        if(ev.factor <= 0.5){ splitAdjNote = `|⚠️ ${ev.date.slice(5).replace('-', '/')} 股票分割,分割前價量已還原重算`; window.__splitDate = ev.date; }
       }
     }catch(e){}
     // 收盤後即時補今日 K 棒(FinMind 通常隔天才更新)
