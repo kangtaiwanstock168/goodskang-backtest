@@ -1,4 +1,4 @@
-// 話題雷達 v3:滾動時間窗(今天+昨天;跨週末自動延長到週五)+主題聚類+行銷稿另計
+// 話題雷達 v4:每檔單一請求抓整窗(請求量砍半,防 FinMind 限流)+空結果不快取(以前空的被 CDN 記 30 分鐘)
 // 同稿跨媒體、跨日轉發只計一次。客觀計數,非選股推薦。© 2026 阿康(goodskang)
 const POOL = ['2330','2303','2317','2454','2382','3231','6669','2376','2356','3008','3406','4958','3376','4938','2474','3324','3017','3653','2368','2408','2344','8299','2337','2327','2308','2301','3665','2059','8210','2345','2412','2603','2609','2615','2618','2610','2882','2881','2891','1519','1513','6415','3034','3037','8046','8039','6213','3323','6805','2049','3661','3443','2383','3711','2379'];
 const THEMES = [
@@ -31,12 +31,14 @@ exports.handler = async () => {
       return j.data || [];
     }catch(e){ return []; }
   };
+  const okDates = new Set(days);
   const fetchStock = async id => {
-    // 週末視窗最多取 3 天,避免請求量爆炸拖垮函式
-    const parts = await Promise.all(days.slice(0, 3).map(d => fetchRaw(id, d)));
+    // 一檔一請求:start=時間窗最舊日(FinMind 預設抓到今天),回來再按日期過濾——請求量從 2~3 倍砍回 1 倍
+    const rows = await fetchRaw(id, days[Math.min(days.length, 3) - 1]);
     const seen = new Set(), out = [];
     let mkt = 0;
-    for(const x of [].concat(...parts)){
+    for(const x of rows){
+      if(!okDates.has(String(x.date || '').slice(0, 10))) continue;
       if((x.link || '').includes('cmoney.tw/forum')) continue;
       const t = cleanT(x.title);
       if(!t) continue;
@@ -76,9 +78,11 @@ exports.handler = async () => {
     return {id: x.id, n: x.list.length, m: x.mkt,
       t: last ? last.t.slice(0, 40) : '(僅權證/行銷稿)', link: last ? last.link : ''};
   }).sort((a, b) => (b.n - a.n) || (b.m - a.m)).slice(0, 15);
+  // 空結果=被限流或冷啟動失敗——絕對不能進 CDN 快取,否則接下來 30 分鐘所有人都看不到
+  const ok = top.length >= 3;
   return {
     statusCode: 200,
-    headers: {'content-type': 'application/json', 'cache-control': 'public, max-age=1800'},
+    headers: {'content-type': 'application/json', 'cache-control': ok ? 'public, max-age=1800' : 'no-store'},
     body: JSON.stringify({day: `${days[days.length - 1]} ~ ${days[0]}`, top, themes: themes.slice(0, 3)})
   };
 };
