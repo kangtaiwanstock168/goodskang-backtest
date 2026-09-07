@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-N|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-O|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-N';
+const APP_VER = 'v20260908-O';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1893,7 +1893,12 @@ async function runDiag(){
     const start2 = `${st2.getFullYear()}-${pz2(st2.getMonth() + 1)}-${pz2(st2.getDate())}`;
     let bars = await fetchPrices(d.id, start2, end2);
     bars = (bars || []).filter(b2 => b2.close > 0 && b2.max > 0 && b2.min > 0).sort((a2, b2) => a2.date.localeCompare(b2.date));
-    try{ const evs2 = await fetchEvents(d.id, start2, end2); adjustPrices(bars, evs2); }catch(e){}
+    let splitNote2 = '';
+    try{
+      const evs2 = await fetchEvents(d.id, start2, end2); adjustPrices(bars, evs2);
+      const cut = bars.length > 120 ? bars[bars.length - 120].date : '';
+      for(const ev of evs2) if(ev.factor <= 0.5 && ev.date >= cut) splitNote2 = `(${ev.date.slice(5).replace('-', '/')} 分割 1拆${Math.round(1 / ev.factor)},分割前價格已還原)`;
+    }catch(e){}
     const n2 = bars.length;
     if(n2 < 260){ out.innerHTML = '歷史資料不足三百根 K,樣本太少不硬算——新股請以結構與防守紀律為主。'; return; }
     const c2 = bars.map(b2 => b2.close), h2 = bars.map(b2 => b2.max), l2 = bars.map(b2 => b2.min);
@@ -1971,8 +1976,12 @@ async function runDiag(){
     const atTop = posNow >= 0.8 || dMa >= 8 || nearHi <= 3;
     const stopTxt = (stopS > 0 && stopS < pNow) ? `跌破防守 <b>${fmt(stopS)}</b> 就走` : '目前沒有有效防守';
     // ── 持倉身世:近半年曾深跌(低於成本 15%+)、如今回到成本附近 = 解套中的長線單,不是規則內的新單 ──
-    let lo120 = Infinity; for(let j = Math.max(0, n2 - 120); j < n2; j++) lo120 = Math.min(lo120, l2[j]);
-    const legacy = pl != null && lo120 < cost * 0.85 && Math.abs(pl) <= 8;
+    let lo120 = Infinity, loIdx = -1;
+    for(let j = Math.max(0, n2 - 120); j < n2; j++) if(l2[j] < lo120){ lo120 = l2[j]; loIdx = j; }
+    // 「解套單」要件:那個低點之前,價格曾到過你的成本(你有可能在那之前買到、然後抱著跌下去);否則低點只是起漲段,不是回檔
+    let reachedBefore = false;
+    if(cost > 0 && loIdx > 0) for(let j = Math.max(0, loIdx - 250); j < loIdx; j++) if(h2[j] >= cost * 0.98){ reachedBefore = true; break; }
+    const legacy = pl != null && reachedBefore && lo120 < cost * 0.85 && Math.abs(pl) <= 8;
     // ── 三策略沙盤(往後 60 天,此股自身歷史同位置):A 續抱|B 跌破防守出場、站回月線再接|C 減半保留(一半 A 一半 B)──
     let sbRow = '';
     if(stopS > 0 && stopS < pNow){
@@ -2019,7 +2028,7 @@ async function runDiag(){
       + row('📊 股性', `歷史上同樣位置 ${sims.length} 次,之後 20 天內:<b>上漲機率 ${win.toFixed(0)}%</b>|平常回檔 <b>${mae50.toFixed(1)}%</b>、較深時到 ${mae25.toFixed(1)}%|通常再漲 <b>+${mfe50.toFixed(1)}%</b>、強一點到 +${mfe75.toFixed(1)}%<br><span style="font-size:.9em; opacity:.85;">防守設得比 ${mae50.toFixed(1)}% 緊,一半機率被正常晃動洗掉;獲利期待超過 +${mfe50.toFixed(1)}%,統計不站你這邊${pNow * (1 + mfe50 / 100) > hi120 ? `(而且 +${mfe50.toFixed(1)}% 已在區間高點 ${fmt(hi120)} 之上,要創新高才有)` : ''}</span>`)
       + row('🛡 防守', stopRow)
       + row('📦 部位', posRow)
-      + (cost > 0 ? row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${legacy ? '・<b style="color:var(--gold);">解套中長線單</b>' : ''}`) : '')
+      + (cost > 0 ? row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${legacy ? '・<b style="color:var(--gold);">解套中長線單</b>' : ''}${splitNote2 ? `<br><span style="font-size:.85em; opacity:.75;">${splitNote2}</span>` : ''}`) : '')
       + row('💰 出場', exitRow)
       + (sbRow ? row('🧪 沙盤', sbRow) : '');
     html += `</div><span style="opacity:.7; font-size:.85em;">歷史統計非預測;樣本為此股自身近三年,市場環境改變時分布會失真。非投資建議。</span>`;
