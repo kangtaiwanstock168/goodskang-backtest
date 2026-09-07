@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-C|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-B';
+const APP_VER = 'v20260908-C';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1851,10 +1851,17 @@ function calcPos(){
   const cost = shares * price, lots = Math.floor(shares / 1000), odd = shares % 1000;
   const qty = `${lots > 0 ? lots + ' 張' : ''}${odd > 0 ? (lots > 0 ? ' ' : '') + odd + ' 股' : ''}`;
   track('position_calc', {stock: d.id});
-  out.innerHTML = `願賠 ${riskPct}% = <b>${Math.round(riskAmt).toLocaleString('zh-TW')} 元</b>|防守距離 ${(per / price * 100).toFixed(1)}%(${fmt(price)} → ${fmt(stop)})`
-    + `<br>→ 最多買 <b style="color:var(--accent); font-size:1rem;">${qty}</b>(約 ${Math.round(cost).toLocaleString('zh-TW')} 元,佔資金 ${(cost / cap * 100).toFixed(0)}%)`
-    + (capped ? '——受總資金上限,實際風險已低於設定' : '')
-    + `;跌破防守出場,最多就賠這筆預算內的小錢。非投資建議,計算僅供參考。`;
+  // 高風險檔位:把連賠數學攤開——順勢訊號勝率僅 3~4 成,連賠 5 筆是常態不是意外
+  const streak5 = (1 - Math.pow(1 - riskPct / 100, 5)) * 100;
+  const recover = (1 / Math.pow(1 - riskPct / 100, 5) - 1) * 100;
+  const warn = riskPct >= 5
+    ? `<br>⚠️ <b class="down">高風險設定:連賠 5 筆資金 -${streak5.toFixed(0)}%,之後要賺 +${recover.toFixed(0)}% 才回本</b>——本工具實測順勢訊號勝率僅 3~4 成,連賠 5 筆是常態;職業風控慣例是 1~3%`
+    : '';
+  out.innerHTML = `願賠 ${riskPct}%(=總資金的 ${riskPct}%,不是股價跌幅)= <b>${Math.round(riskAmt).toLocaleString('zh-TW')} 元</b>|防守距離 ${(per / price * 100).toFixed(1)}%(${fmt(price)} → ${fmt(stop)},每股風險 ${per.toFixed(1)} 元)`
+    + `<br>→ 最多買 <b style="color:var(--accent); font-size:1rem;">${qty}</b>(約 ${Math.round(cost).toLocaleString('zh-TW')} 元,佔資金 ${(cost / cap * 100).toFixed(0)}%——這是進場金額,不是風險;<b>跌破防守砍掉,最多就賠 ${Math.round(Math.min(riskAmt, cost)).toLocaleString('zh-TW')} 元</b>)`
+    + (capped ? ';受總資金上限,實際風險已低於設定' : '')
+    + warn
+    + `<br>非投資建議,計算僅供參考。`;
 }
 
 // 📸 限動分享圖卡:把五燈檢查表+標註K線畫成 1080×1920 直式圖,手機直接分享、電腦下載
@@ -3151,7 +3158,7 @@ async function renderAiInsight(stockId, name){
         + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem;">總資金`
         + `<input id="posCap" type="text" inputmode="numeric" value="${(localStorage.getItem('posCap') || '500000')}" style="width:100px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
         + `元|單筆願賠 <select id="posRisk" style="padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
-        + ['1', '2', '3'].map(rv => `<option value="${rv}"${(localStorage.getItem('posRisk') || '2') === rv ? ' selected' : ''}>${rv}%</option>`).join('')
+        + [['1', '1%(保守)'], ['2', '2%(標準)'], ['3', '3%(積極)'], ['5', '5%(高風險)'], ['10', '10%(危險)']].map(([rv, lb]) => `<option value="${rv}"${(localStorage.getItem('posRisk') || '2') === rv ? ' selected' : ''}>${lb}</option>`).join('')
         + `</select><button onclick="calcPos()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); font-weight:700; cursor:pointer;">算張數</button></div>`
         + `<p id="posOut" class="hint" style="margin:7px 0 0; line-height:1.7;">防守越近能買越多、防守越遠只能買越少——倉位跟著風險走,凹單就沒戲唱。</p></div>`
         + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 分享我的回測戰績卡(IG 限動尺寸)</button>`
