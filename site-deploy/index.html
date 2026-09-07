@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260902-S|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260907-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260902-S';
+const APP_VER = 'v20260907-A';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -639,6 +639,7 @@ function updateDcaHint(){
   renderWatchBoard();   // 回訪者的每日看板:背景載入,不擋自動示範
   renderRadar();        // 盤後強勢股雷達:背景載入
   renderTopic();        // 話題雷達(新聞熱度):背景載入
+  renderComeback();     // 🔔 回訪變化摘要:你上次查的股票,現在怎麼了——回訪者的第一眼
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
   setTimeout(() => { try{ run(true); }catch(e){} }, fromShare ? 400 : 1200);
 })();
@@ -2232,6 +2233,57 @@ async function renderWatchBoard(){
       refreshWatchBoard();
       if(!isMktOpen() && watchTimer){ clearInterval(watchTimer); watchTimer = null; }
     }, 60000);
+  }catch(e){}
+}
+
+// 🔔 回訪變化摘要:sigLog 記著「你上次查這檔時工具說了什麼」,回訪第一眼直接告訴你「後來呢」
+// ——人對自己看過的東西發生變化有近乎強迫症的好奇心,這就是每日回訪的理由
+async function renderComeback(){
+  try{
+    const log = JSON.parse(localStorage.getItem('sigLog') || '{}');
+    const t0 = new Date(), pz = n => String(n).padStart(2, '0');
+    const today0 = `${t0.getFullYear()}-${pz(t0.getMonth() + 1)}-${pz(t0.getDate())}`;
+    const ids = Object.keys(log).filter(id => /^[0-9]{4,6}$/.test(id) && log[id] && log[id].p > 0);
+    // 至少要有一筆「今天之前」的紀錄才叫回訪——第一次來就分析的人不用看這區
+    if(!ids.length || !ids.some(id => log[id].d < today0)) return;
+    const pick = ids.slice(-6);   // 最近查過的 6 檔
+    const lm = await fetchLiveBatch(pick);
+    // 等股名清單(最多 3 秒),沒有就顯示代號
+    for(let w = 0; w < 10 && !stockList; w++) await new Promise(rs => setTimeout(rs, 300));
+    const nmOf = id => { const hit = (stockList || []).find(s2 => s2.id === id); return hit ? hit.name : id; };
+    const rows = [];
+    for(const id of pick){
+      const sg = log[id], lv = lm[id];
+      if(!sg || !lv || !(lv.p > 0)) continue;
+      const chg = (lv.p - sg.p) / sg.p * 100;
+      const broke = sg.s > 0 && lv.p < sg.s;
+      rows.push({id, nm: nmOf(id), chg, broke, tag: sg.t, d: sg.d, p: lv.p});
+    }
+    if(!rows.length) return;
+    // 排序:跌破防守的最前(最需要知道),再按變化幅度
+    rows.sort((a2, b2) => (b2.broke - a2.broke) || (Math.abs(b2.chg) - Math.abs(a2.chg)));
+    const chip = r => {
+      const c = r.chg >= 0 ? 'var(--red)' : 'var(--green)';
+      const guard = r.broke ? '<b style="color:var(--green);">跌破防守 ✗</b>' : (r.chg >= 5 ? '<b style="color:var(--red);">噴出 🔥</b>' : '守住 ✓');
+      return `<button type="button" class="chip" style="display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; padding:8px 12px; margin:4px 6px 2px 0; line-height:1.45; text-align:left;" onclick="quickRun('${r.id} ${r.nm.replace(/[<>'\"]/g, '')}')">`
+        + `<span><b>${r.nm}</b> <span style="opacity:.65; font-size:.78rem;">${r.d.slice(5).replace('-', '/')} 判「${r.tag}」</span></span>`
+        + `<span>之後 <b style="color:${c};">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(1)}%</b>|${guard}</span></button>`;
+    };
+    const alert = rows.filter(r => r.broke).length;
+    let card = $('comebackCard');
+    if(!card){
+      card = document.createElement('div');
+      card.id = 'comebackCard';
+      card.className = 'card';
+      const tc2 = $('topicCard');
+      if(tc2 && tc2.parentNode) tc2.parentNode.insertBefore(card, tc2);
+      else return;
+    }
+    card.innerHTML = `<h2 class="section" style="margin-top:0;">🔔 上次來之後——你查過的股票現在怎麼了</h2>`
+      + `<p class="hint" style="margin:2px 0 8px;">${alert ? `<b style="color:var(--green);">${alert} 檔已跌破當時的防守位</b>,優先看;` : '都還在防守位之上;'}點卡片直接重跑今天最新的五燈與回測。</p>`
+      + `<div>${rows.map(chip).join('')}</div>`;
+    card.style.display = 'block';
+    track('comeback', {n: rows.length, broke: alert});
   }catch(e){}
 }
 
