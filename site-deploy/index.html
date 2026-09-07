@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-K|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-N|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-K';
+const APP_VER = 'v20260908-N';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1912,7 +1912,7 @@ async function runDiag(){
         if((c2[i] > ma20a[i]) !== aboveNow) continue;
         let mae = 0, mfe = 0;
         for(let j = i + 1; j <= i + 20; j++){ mae = Math.min(mae, l2[j] / c2[i] - 1); mfe = Math.max(mfe, h2[j] / c2[i] - 1); }
-        sims.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe});
+        sims.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe, i});
       }
       band = 0.25;   // 樣本不夠就放寬位階帶再掃一次
     }
@@ -1932,12 +1932,12 @@ async function runDiag(){
     if(stopS > 0 && stopS < pNow){
       const ds = (pNow - stopS) / pNow * 100;
       let chk;
-      if(ds < -mae50) chk = `<b class="down">⚠ 比統計中位回檔(${mae50.toFixed(1)}%)還緊</b>——一半機率被正常波動洗掉,當沖可用;抱波段請退到統計帶 ${fmt(bandHi)}~${fmt(bandLo)}${(Number(d.altStop) || 0) > 0 ? ` 或結構次層 ${fmt(d.altStop)}` : ''}`;
-      else if(ds > -mae25) chk = `比統計深尾(${mae25.toFixed(1)}%)還寬——抱得住但賠得偏多,可考慮縮進統計帶 ${fmt(bandHi)}~${fmt(bandLo)}`;
-      else chk = `<b class="up">✓ 落在統計合理帶</b> ${mae50.toFixed(1)}%~${mae25.toFixed(1)}%(${fmt(bandHi)}~${fmt(bandLo)})之內——結構與統計互相印證`;
+      if(ds < -mae50) chk = `<b class="down">⚠ 比這檔平常的回檔(約 ${mae50.toFixed(0)}%)還緊</b>——一半機率被正常晃動洗掉,當沖用;抱波段退到 ${fmt(bandHi)}~${fmt(bandLo)}${(Number(d.altStop) || 0) > 0 ? ` 或次層支撐 ${fmt(d.altStop)}` : ''}`;
+      else if(ds > -mae25) chk = `比這檔較深的回檔(約 ${mae25.toFixed(0)}%)還寬——抱得住但賠得偏多,可縮到 ${fmt(bandHi)}~${fmt(bandLo)}`;
+      else chk = `<b class="up">✓ 合理</b>——落在這檔平常回檔幅度 ${mae50.toFixed(0)}%~${mae25.toFixed(0)}% 之內(${fmt(bandHi)}~${fmt(bandLo)}),不會被日常晃動洗掉`;
       stopRow = `<b>${fmt(stopS)}</b>(-${ds.toFixed(1)}%)<br><span style="font-size:.9em;">${chk}</span>`;
     }else{
-      stopRow = `<b class="down">目前無有效結構防守(破底中)</b>——統計上相似位置 20 日內還可能回 ${mae50.toFixed(1)}%~${mae25.toFixed(1)}%;依紀律此處不進場`;
+      stopRow = `<b class="down">目前無有效防守(破底中)</b>——歷史上同樣位置 20 天內還常再跌 ${mae50.toFixed(0)}%~${mae25.toFixed(0)}%;依紀律不進場`;
     }
     // ── 部位:讀取上方計算器的設定(張數模式或風險模式)──
     let posRow = '';
@@ -1957,7 +1957,7 @@ async function runDiag(){
         if(stopS > 0 && stopS < pNow) posRow += `|跌破防守賠 <b class="down">${$n(sh * (pNow - stopS))} 元</b>${lt > 0 ? `,每張 ${$n((pNow - stopS) * 1000)} 元` : ''}${mode === 'A' && capV > 0 ? `(=資金 ${(sh * (pNow - stopS) / capV * 100).toFixed(1)}%)` : ''}`;
       }else posRow = `<span style="opacity:.8;">上方計算器還沒設部位——選「依張數」填張數,或「依風險」填總資金,再按一次診斷</span>`;
     }catch(e){ posRow = ''; }
-    // ── 出場地圖:市場不知道你的成本——只看結構(位階/前高/乖離/量價),三層:硬規則 → 高檔調節區 → 防賣飛 ──
+    // ── 出場:防守不看成本(市場不在意你買多少),但「調節/減碼」本質是損益問題——沒獲利就沒有調節這回事 ──
     const pl = cost > 0 ? (pNow - cost) / cost * 100 : null;
     let hi120 = 0, hi40 = 0;
     for(let j = Math.max(0, n2 - 120); j < n2; j++) hi120 = Math.max(hi120, h2[j]);
@@ -1968,28 +1968,60 @@ async function runDiag(){
     const volXn = v5s > 0 ? (lastB.Trading_Volume || 0) / (v5s / Math.min(5, n2 - 1)) : 0;
     const blackBig = volXn >= 2 && lastB.close < lastB.open && pNow >= hi40 * 0.97;
     const nearHi = hi120 > 0 ? (hi120 - pNow) / pNow * 100 : 99;
-    const ext = pNow * (1 + mfe50 / 100);
-    const hardLine = stopS > 0 && stopS < pNow
-      ? `▸ <b>硬規則</b>:收盤跌破移動防守 <b>${fmt(stopS)}</b> 才出場——出場只看結構,不看成本`
-      : `▸ <b>硬規則</b>:目前無有效防守=沒有持倉依據`;
     const atTop = posNow >= 0.8 || dMa >= 8 || nearHi <= 3;
-    let adjLine;
-    if(atTop){
-      adjLine = `▸ <b style="color:var(--gold);">高檔調節區</b>:現價在區間 ${(posNow * 100).toFixed(0)}%、距區間高點 ${fmt(hi120)} 僅 ${nearHi.toFixed(1)}%${dMa >= 8 ? `、乖離月線 +${dMa.toFixed(1)}%` : ''}——依紀律可<b>分批調節 1/3~1/2</b>,留倉跟移動防守走,<b>不全出</b>`
-        + (blackBig ? `;<b class="down">今日高檔爆量收黑=出貨警訊,調節優先</b>` : '')
-        + `。統計註記:相似位置再漲中位 +${mfe50.toFixed(1)}%(約 ${fmt(ext)})${ext > hi120 ? `,<b>已超過區間高點 ${fmt(hi120)}=要創新高才有這段</b>——${d.nh40 ? '今日帶量創新高,這段有可能' : '沒有帶量創高之前別預設它會到'}` : ''}`;
-    }else{
-      adjLine = `▸ <b>調節區</b>:距區間高點 ${fmt(hi120)} 還有 ${nearHi.toFixed(1)}%,統計再漲中位 +${mfe50.toFixed(1)}%(約 ${fmt(ext)})——接近其一再考慮分批,現在不急`;
+    const stopTxt = (stopS > 0 && stopS < pNow) ? `跌破防守 <b>${fmt(stopS)}</b> 就走` : '目前沒有有效防守';
+    // ── 持倉身世:近半年曾深跌(低於成本 15%+)、如今回到成本附近 = 解套中的長線單,不是規則內的新單 ──
+    let lo120 = Infinity; for(let j = Math.max(0, n2 - 120); j < n2; j++) lo120 = Math.min(lo120, l2[j]);
+    const legacy = pl != null && lo120 < cost * 0.85 && Math.abs(pl) <= 8;
+    // ── 三策略沙盤(往後 60 天,此股自身歷史同位置):A 續抱|B 跌破防守出場、站回月線再接|C 減半保留(一半 A 一半 B)──
+    let sbRow = '';
+    if(stopS > 0 && stopS < pNow){
+      const ds = (pNow - stopS) / pNow, fee = 0.00585;
+      const A = [], B = [], C = [];
+      for(const x2 of sims){
+        const i = x2.i; if(i >= n2 - 61) continue;
+        let bad2 = false; for(let j = i + 1; j <= i + 60; j++) if(Math.abs(c2[j] / c2[j - 1] - 1) > 0.115){ bad2 = true; break; }
+        if(bad2) continue;
+        const e = c2[i], ra = c2[i + 60] / e - 1;
+        let pos = true, entry = e, eq = 1;
+        for(let j = i + 1; j <= i + 60; j++){
+          if(pos){ if(c2[j] < entry * (1 - ds)){ eq *= (c2[j] / entry) * (1 - fee); pos = false; } }
+          else if(c2[j] > ma20a[j] && c2[j - 1] <= ma20a[j - 1]){ entry = c2[j]; pos = true; }
+        }
+        if(pos) eq *= c2[i + 60] / entry;
+        const rb = eq - 1;
+        A.push(ra); B.push(rb); C.push((ra + rb) / 2);
+      }
+      if(A.length >= 15){
+        const st = arr => ({avg: arr.reduce((a2, b2) => a2 + b2, 0) / arr.length * 100, win: arr.filter(r3 => r3 > 0).length / arr.length * 100, bad: arr.filter(r3 => r3 <= -0.10).length / arr.length * 100});
+        const sA = st(A), sB = st(B), sC = st(C);
+        const best = [['續抱', sA], ['防守出場再接', sB], ['減半保留', sC]].sort((p1, p2) => p2[1].avg - p1[1].avg)[0];
+        const cell = (nm, s4) => `<b>${nm}</b> 平均 <b class="${s4.avg >= 0 ? 'up' : 'down'}">${s4.avg >= 0 ? '+' : ''}${s4.avg.toFixed(1)}%</b>・勝率 ${s4.win.toFixed(0)}%・大賠 ${s4.bad.toFixed(0)}%`;
+        sbRow = `同位置 ${A.length} 次、往後 60 天三種做法實測:<br>${cell('① 續抱不動', sA)}<br>${cell('② 跌破防守出場、站回月線再接', sB)}<br>${cell('③ 減半保留', sC)}<br><span style="font-size:.9em; opacity:.85;">數據偏向:<b>${best[0]}</b>(平均報酬最高;「大賠」=60 天後仍虧 10% 以上的比例,含來回手續費稅 0.585%)——三個數字攤開,做法你選</span>`;
+      }
     }
-    const guardLine = `▸ <b>防賣飛</b>:多頭延伸期最貴的錯不是賠錢、是賣飛——沒跌破移動防守、沒出現爆量長黑,就<b>分批不全出</b>${d.nh40 ? ';<b class="up">今日帶量創新高,順勢規則此時不減碼</b>,等第一根收盤跌破 5 日線再處理' : ''}`;
-    const bigWin = (pl != null && pl >= 30) ? `▸ <b>大賺持倉(+${pl.toFixed(0)}%)</b>:時間軸跟短波段不同,上面的統計只是短線天氣;鎖利靠移動防守隨趨勢墊高,不設固定停利價<br>` : '';
-    const exitRow = bigWin + hardLine + '<br>' + adjLine + '<br>' + guardLine;
+    let exitRow;
+    if(pl == null){
+      exitRow = `${stopTxt},不攤平。${atTop ? `現價貼近區間高點 ${fmt(hi120)},此刻進場屬追高——要買也分批、不梭哈` : `距區間高點 ${fmt(hi120)} 還有 ${nearHi.toFixed(1)}%,照結構規則走即可`}`;
+    }else if(legacy){
+      exitRow = `<b>解套中的長線持倉</b>(近半年曾跌到 ${fmt(lo120)},比成本低 ${((1 - lo120 / cost) * 100).toFixed(0)}%,如今回到成本附近 ${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%)——這不是規則內的新單,「跌破就走」對你不適用。真正的問題是:<b>在成本附近先減一部分、還是續抱吃完整段?</b> 看下方沙盤的三個數字,別憑感覺${atTop ? ';現價又貼近區間高點,若要減碼,這裡是統計上合理的減碼區' : ''}`;
+    }else if(pl < 0){
+      exitRow = `<b>浮虧 ${pl.toFixed(1)}%,沒有獲利可調節</b>——這裡只有一個問題:${stopTxt}、還沒破就抱住,別因為賠錢就亂動。攤平不在順勢規則裡`;
+    }else if(pl < 10){
+      exitRow = `<b>小賺 +${pl.toFixed(1)}%,獲利還薄</b>——先顧防守(${stopTxt}),不急著減碼;${blackBig ? '<b class="down">但今日高檔爆量收黑是出貨警訊,可先保本減一部分</b>' : `等靠近區間高點 ${fmt(hi120)}(還有 ${nearHi.toFixed(1)}%)或統計再漲空間 +${mfe50.toFixed(0)}% 附近再考慮分批`}`;
+    }else{
+      exitRow = atTop
+        ? `<b>獲利 +${pl.toFixed(0)}%、現價又貼近區間高點 ${fmt(hi120)}</b>——可<b>分批調節 1/3~1/2</b> 落袋,留倉跟移動防守走(${stopTxt});<b>別全出</b>,多頭延伸期賣飛比賠錢貴${blackBig ? ';<b class="down">今日高檔爆量收黑,調節優先</b>' : (d.nh40 ? ';今日帶量創新高,順勢此時可不減碼' : '')}`
+        : `<b>獲利 +${pl.toFixed(0)}%</b>——用移動防守鎖利(${stopTxt}),不設固定停利價;距區間高點 ${fmt(hi120)} 還有 ${nearHi.toFixed(1)}%,不急著減碼。統計上這裡通常再漲約 +${mfe50.toFixed(0)}%,期待更多要靠創新高帶量,不是靠等`;
+    }
     let html = `<div style="margin-top:4px;">`
-      + row('📍 位階', `${posTxt}、月線之${aboveNow ? '上' : '下'}|相似日 ${sims.length} 個 → <b>20 日勝率 ${win.toFixed(0)}%</b>`)
+      + row('📍 位階', `${posTxt}、月線之${aboveNow ? '上' : '下'}`)
+      + row('📊 股性', `歷史上同樣位置 ${sims.length} 次,之後 20 天內:<b>上漲機率 ${win.toFixed(0)}%</b>|平常回檔 <b>${mae50.toFixed(1)}%</b>、較深時到 ${mae25.toFixed(1)}%|通常再漲 <b>+${mfe50.toFixed(1)}%</b>、強一點到 +${mfe75.toFixed(1)}%<br><span style="font-size:.9em; opacity:.85;">防守設得比 ${mae50.toFixed(1)}% 緊,一半機率被正常晃動洗掉;獲利期待超過 +${mfe50.toFixed(1)}%,統計不站你這邊${pNow * (1 + mfe50 / 100) > hi120 ? `(而且 +${mfe50.toFixed(1)}% 已在區間高點 ${fmt(hi120)} 之上,要創新高才有)` : ''}</span>`)
       + row('🛡 防守', stopRow)
       + row('📦 部位', posRow)
-      + row('💰 出場', exitRow);
-    if(cost > 0) html += row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${pl <= -8 ? '——<b class="down">已浮虧</b>:若防守早已跌破還抱著,那是凹單不是持倉' : ''}`);
+      + (cost > 0 ? row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${legacy ? '・<b style="color:var(--gold);">解套中長線單</b>' : ''}`) : '')
+      + row('💰 出場', exitRow)
+      + (sbRow ? row('🧪 沙盤', sbRow) : '');
     html += `</div><span style="opacity:.7; font-size:.85em;">歷史統計非預測;樣本為此股自身近三年,市場環境改變時分布會失真。非投資建議。</span>`;
     out.innerHTML = html;
     track('diag', {stock: d.id, n: sims.length});
@@ -2803,7 +2835,7 @@ function taChecklist(s, instNet){
       }
     }
   }
-  // 🚀 創新高帶量(首日):110 檔 ETF 成分股 × 3 年實測最有優勢的樣態——20 日內漲逾 10% 機率約 47%(一般日 36%)、中位報酬約兩倍
+  // 🚀 創新高帶量(首日):110 檔 ETF 成分股 × 3 年實測最有優勢的樣態——20 日內漲逾 10% 機率約 47%(一般日 36%)、典型漲幅約兩倍
   // 定義:收盤首次突破前 40 日最高價,且量 ≥ 5 日均量 1.3 倍
   let nh40 = false;
   if(n >= 45){
@@ -2814,7 +2846,7 @@ function taChecklist(s, instNet){
   }
   if(nh40){
     if(vIcon !== '❌') vIcon = '✅';
-    vTxt += `<br>🚀 <b>帶量突破 40 日新高(首日)</b>——本工具實測(110 檔 ETF 成分股×3 年):此樣態後 20 日內曾漲逾 10% 的機率約 47%、一般日約 36%,中位報酬約為一般日的兩倍;<b>但突破失敗時跌得也快,防守紀律照舊、不可省</b>${(last.live && !last.fixed) ? '(盤中量為推估,收盤確認突破才算成立)' : ''}`;
+    vTxt += `<br>🚀 <b>帶量突破 40 日新高(首日)</b>——本工具實測(110 檔 ETF 成分股×3 年):此樣態後 20 日內曾漲逾 10% 的機率約 47%、一般日約 36%,典型漲幅約為一般日的兩倍;<b>但突破失敗時跌得也快,防守紀律照舊、不可省</b>${(last.live && !last.fixed) ? '(盤中量為推估,收盤確認突破才算成立)' : ''}`;
   }
   items.push({icon: vIcon, name: '量價', txt: vTxt});
   // ⑤ 法人籌碼:外資+投信近 5 日合計——漲勢有沒有法人真金白銀,決定續航力;法人賣、行情漲=別人在拉,隔日沖劇本警戒
