@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-B|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-A';
+const APP_VER = 'v20260908-B';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1828,6 +1828,35 @@ function bumpStreak(){
   }catch(e){ return 0; }
 }
 
+// 🧮 部位計算器:願賠金額 ÷ 防守距離 = 最多股數——第三輪研究實測勝率僅 3~4 成,靠倉位紀律把小賠換大賺
+function calcPos(){
+  const d = window.__cardD;
+  const out = $('posOut');
+  if(!d || !out) return;
+  const price = d.p > 0 ? d.p : 0, stop = Number(d.stop) || 0;
+  const cap = Number(($('posCap').value || '').replace(/,/g, '')) || 0;
+  const riskPct = Number($('posRisk').value) || 2;
+  if(!(cap > 0)){ out.textContent = '請先輸入總資金。'; return; }
+  try{ localStorage.setItem('posCap', String(cap)); localStorage.setItem('posRisk', String(riskPct)); }catch(e){}
+  if(!(price > 0) || !(stop > 0) || stop >= price){
+    out.innerHTML = '目前無有效防守位(破底中或資料不足)——<b>依紀律此處不進場</b>,沒有可計算的倉位。';
+    return;
+  }
+  const riskAmt = cap * riskPct / 100, per = price - stop;
+  let shares = Math.floor(riskAmt / per);
+  const capMax = Math.floor(cap / price);
+  let capped = false;
+  if(shares > capMax){ shares = capMax; capped = true; }
+  if(shares < 1){ out.innerHTML = `防守距離 ${(per / price * 100).toFixed(1)}% 太寬或資金太小,連 1 股都買不了——這筆按紀律只能放棄,等防守更近的進場點。`; return; }
+  const cost = shares * price, lots = Math.floor(shares / 1000), odd = shares % 1000;
+  const qty = `${lots > 0 ? lots + ' 張' : ''}${odd > 0 ? (lots > 0 ? ' ' : '') + odd + ' 股' : ''}`;
+  track('position_calc', {stock: d.id});
+  out.innerHTML = `願賠 ${riskPct}% = <b>${Math.round(riskAmt).toLocaleString('zh-TW')} 元</b>|防守距離 ${(per / price * 100).toFixed(1)}%(${fmt(price)} → ${fmt(stop)})`
+    + `<br>→ 最多買 <b style="color:var(--accent); font-size:1rem;">${qty}</b>(約 ${Math.round(cost).toLocaleString('zh-TW')} 元,佔資金 ${(cost / cap * 100).toFixed(0)}%)`
+    + (capped ? '——受總資金上限,實際風險已低於設定' : '')
+    + `;跌破防守出場,最多就賠這筆預算內的小錢。非投資建議,計算僅供參考。`;
+}
+
 // 📸 限動分享圖卡:把五燈檢查表+標註K線畫成 1080×1920 直式圖,手機直接分享、電腦下載
 async function makeShareCard(){
   const d = window.__cardD;
@@ -2612,7 +2641,7 @@ function taChecklist(s, instNet){
   let bIcon, bTxt;
   if(trend === '空頭'){ bIcon = '❌'; bTxt = '空頭結構沒有「回後買上漲」——反彈走的是「彈後空下跌」的劇本'; }
   else if(trend === '轉多'){ bIcon = '⚠️'; bTxt = '轉多確認日通常已是長紅——順勢紀律不追突破當天,等回測頸線(前高)不破後的第一根上漲紅K再說'; }
-  else if(trend === '多頭' && above && nearMA && redUp){ bIcon = '✅'; bTxt = '近日回測月線不破+今日收紅上漲——「回後買上漲」樣態成立'; }
+  else if(trend === '多頭' && above && nearMA && redUp){ bIcon = '✅'; bTxt = '近日回測月線不破+今日收紅上漲——「回後買上漲」樣態成立。<span style="color:var(--muted);">誠實註記:本工具實測(109 檔×3 年)此樣態報酬與一般日相當,它的價值在防守近、賠得少,不在漲得多</span>'; }
   else if(trend === '多頭' && last.close > ma20 * 1.08){ bIcon = '⚠️'; bTxt = `乖離月線已 ${((last.close / ma20 - 1) * 100).toFixed(1)}%,此刻進場屬於追高——順勢紀律是等回測支撐不破後的第一根上漲紅K`; }
   else { bIcon = '⚠️'; bTxt = '「回後買上漲」條件未成立——不追突破長紅,等回測支撐後的第一根上漲紅K'; }
   items.push({icon: bIcon, name: '買點紀律', txt: bTxt});
@@ -2686,7 +2715,7 @@ function taChecklist(s, instNet){
     : score >= thF
     ? `🚦 綜合:日K環境對「做多短線/當沖」<b class="up">相對友善</b>(${score}/${nItems} 綠燈)——但短線成敗在盤中紀律,環境好不等於會賺。`
     : (trend === '多頭' && bIcon === '✅')
-    ? `🚦 綜合:<b class="up">順勢買點浮現</b>(${score}/${nItems} 綠燈)——「回後買上漲」樣態成立,這是順勢框架裡位階最高的進場訊號;但配套燈號未滿(留意季線壓力或法人動向),倉位打折、防守 <b>${fmt(lastLow)}</b> 嚴格執行,跌破不戀戰。`
+    ? `🚦 綜合:<b class="up">順勢買點浮現</b>(${score}/${nItems} 綠燈)——「回後買上漲」樣態成立,這是順勢框架裡<b>賠率結構最好</b>的進場位置(防守近、賠得少);但配套燈號未滿(留意季線壓力或法人動向),倉位打折、防守 <b>${fmt(lastLow)}</b> 嚴格執行,跌破不戀戰。`
     : (trend === '多頭' && score >= thL)
     ? `🚦 綜合:<b class="up">順勢偏多</b>(${score}/${nItems} 綠燈)——日K趨勢向上,但短線條件未齊——與其追高,不如等拉回支撐(${fmt(lastLow)} / 月線 ${fmt(ma20)})再接,順勢不追勢。`
     : (phase === '打底' && (score >= 1 || nearNeck))
@@ -3073,7 +3102,7 @@ async function renderAiInsight(stockId, name){
     // 📸 分享圖卡資料:存下當前判讀,按鈕按下時照這份畫圖
     try{
       const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
-      window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, price: fmt(lastC),
+      window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, p: lastC, price: fmt(lastC),
         pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
         stop: ckObj.lastLow, score: ckObj.score, nItems: ckObj.nItems} : null;
     }catch(e){ window.__cardD = null; }
@@ -3117,6 +3146,14 @@ async function renderAiInsight(stockId, name){
         + `<p style="margin:0 0 10px; padding:9px 12px; border-radius:8px; font-weight:700; border:1px solid ${bc}; background:${bg}; line-height:1.7;">${ckObj.verdict}</p>`
         + ckObj.items.map(x => `<p style="margin:6px 0; line-height:1.7; font-size:.95rem;">${x.icon} <b>${x.name}:</b>${x.txt}</p>`).join('')
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🛡 <b>防守參考:</b>${ckObj.stop}</p>`
+        + `<div style="margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:8px;">`
+        + `<p style="font-weight:700; margin:0 0 6px; font-size:.92rem;">🧮 部位計算器——勝率變成獲利的最後一哩</p>`
+        + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem;">總資金`
+        + `<input id="posCap" type="text" inputmode="numeric" value="${(localStorage.getItem('posCap') || '500000')}" style="width:100px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
+        + `元|單筆願賠 <select id="posRisk" style="padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
+        + ['1', '2', '3'].map(rv => `<option value="${rv}"${(localStorage.getItem('posRisk') || '2') === rv ? ' selected' : ''}>${rv}%</option>`).join('')
+        + `</select><button onclick="calcPos()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); font-weight:700; cursor:pointer;">算張數</button></div>`
+        + `<p id="posOut" class="hint" style="margin:7px 0 0; line-height:1.7;">防守越近能買越多、防守越遠只能買越少——倉位跟著風險走,凹單就沒戲唱。</p></div>`
         + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 分享我的回測戰績卡(IG 限動尺寸)</button>`
         + `<p class="hint" style="margin-top:8px;">依經典順勢規則自動比對日K,僅描述現狀、非投資建議;當沖損益放大,風險自負。</p></div>`;
     }
