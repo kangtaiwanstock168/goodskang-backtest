@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-F|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-F';
+const APP_VER = 'v20260908-H';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1828,6 +1828,19 @@ function bumpStreak(){
   }catch(e){ return 0; }
 }
 
+// 分頁切換:兩種算法是兩種思維(風險→部位/部位→風險),平行分隔、互不打架
+function posTab(t){
+  const a = $('posPaneA'), b = $('posPaneB'), ta = $('posTabA'), tb = $('posTabB');
+  if(!a || !b || !ta || !tb) return;
+  const on = 'flex:1; padding:7px; border-radius:8px; font-weight:700; cursor:pointer; border:1px solid var(--accent); background:rgba(88,166,255,.15); color:var(--accent); font-size:.88rem;';
+  const off = 'flex:1; padding:7px; border-radius:8px; font-weight:700; cursor:pointer; border:1px solid var(--border); background:none; color:var(--muted); font-size:.88rem;';
+  a.style.display = t === 'A' ? 'block' : 'none';
+  b.style.display = t === 'B' ? 'block' : 'none';
+  ta.style.cssText = t === 'A' ? on : off;
+  tb.style.cssText = t === 'B' ? on : off;
+  try{ localStorage.setItem('posMode', t); }catch(e){}
+}
+
 // 🧮 部位計算器:願賠金額 ÷ 防守距離 = 最多股數——第三輪研究實測勝率僅 3~4 成,靠倉位紀律把小賠換大賺
 function calcPos(){
   const d = window.__cardD;
@@ -1865,10 +1878,70 @@ function calcPos(){
     + `<br>非投資建議,計算僅供參考。`;
 }
 
+// 🩺 持倉診斷:抓該股三年還原價,找「同位階(120日區間百分位 ±15pp)+同趨勢側(月線上下一致)」的相似日
+// 統計之後 20 日:勝率、最大回檔(MAE)與最大漲幅(MFE)分布——回答「勝率多少、跑多少 % 保險、貼高還是貼低」
+async function runDiag(){
+  const d = window.__cardD;
+  const out = $('dxOut');
+  if(!d || !out){ return; }
+  const cost = Number(($('dxCost').value || '').replace(/,/g, '')) || 0;
+  out.innerHTML = '⏳ 抓取三年歷史還原價,計算中…';
+  try{
+    const now2 = new Date(), pz2 = x2 => String(x2).padStart(2, '0');
+    const end2 = `${now2.getFullYear()}-${pz2(now2.getMonth() + 1)}-${pz2(now2.getDate())}`;
+    const st2 = new Date(now2); st2.setFullYear(st2.getFullYear() - 3);
+    const start2 = `${st2.getFullYear()}-${pz2(st2.getMonth() + 1)}-${pz2(st2.getDate())}`;
+    let bars = await fetchPrices(d.id, start2, end2);
+    bars = (bars || []).filter(b2 => b2.close > 0 && b2.max > 0 && b2.min > 0).sort((a2, b2) => a2.date.localeCompare(b2.date));
+    try{ const evs2 = await fetchEvents(d.id, start2, end2); adjustPrices(bars, evs2); }catch(e){}
+    const n2 = bars.length;
+    if(n2 < 260){ out.innerHTML = '歷史資料不足三百根 K,樣本太少不硬算——新股請以結構與防守紀律為主。'; return; }
+    const c2 = bars.map(b2 => b2.close), h2 = bars.map(b2 => b2.max), l2 = bars.map(b2 => b2.min);
+    const ma20a = new Array(n2).fill(0); let sm = 0;
+    for(let i = 0; i < n2; i++){ sm += c2[i]; if(i >= 20) sm -= c2[i - 20]; if(i >= 19) ma20a[i] = sm / 20; }
+    const pctile = i => { let hi = 0, lo = Infinity; for(let j = Math.max(0, i - 119); j <= i; j++){ hi = Math.max(hi, h2[j]); lo = Math.min(lo, l2[j]); } return hi > lo ? (c2[i] - lo) / (hi - lo) : 0.5; };
+    const pNow = d.p > 0 ? d.p : c2[n2 - 1];
+    const posNow = pctile(n2 - 1), aboveNow = pNow > ma20a[n2 - 1];
+    // 相似日掃描
+    let band = 0.15, sims = [];
+    for(let pass = 0; pass < 2 && sims.length < 30; pass++){
+      sims = [];
+      for(let i = 130; i < n2 - 21; i++){
+        if(Math.abs(c2[i + 1] / c2[i] - 1) > 0.115) continue;
+        if(Math.abs(pctile(i) - posNow) > band) continue;
+        if((c2[i] > ma20a[i]) !== aboveNow) continue;
+        let mae = 0, mfe = 0;
+        for(let j = i + 1; j <= i + 20; j++){ mae = Math.min(mae, l2[j] / c2[i] - 1); mfe = Math.max(mfe, h2[j] / c2[i] - 1); }
+        sims.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe});
+      }
+      band = 0.25;   // 樣本不夠就放寬位階帶再掃一次
+    }
+    if(sims.length < 15){ out.innerHTML = `歷史上跟現在同位階同趨勢的日子只有 ${sims.length} 個——樣本太少,統計不可信,此題誠實棄答;請回歸結構防守。`; return; }
+    const q = (arr, p3) => { const s3 = [...arr].sort((a2, b2) => a2 - b2); return s3[Math.min(s3.length - 1, Math.floor(s3.length * p3))]; };
+    const rs2 = sims.map(x2 => x2.r20), maes = sims.map(x2 => x2.mae), mfes = sims.map(x2 => x2.mfe);
+    const win = rs2.filter(r3 => r3 > 0).length / sims.length * 100;
+    const mae50 = q(maes, 0.5) * 100, mae25 = q(maes, 0.25) * 100;   // 25 分位=較深的那端
+    const mfe50 = q(mfes, 0.5) * 100, mfe75 = q(mfes, 0.75) * 100;
+    const posTxt = posNow >= 0.8 ? `<b class="up">貼近高點</b>(近半年區間 ${(posNow * 100).toFixed(0)}% 位置)` : posNow <= 0.2 ? `<b class="down">貼近低點</b>(區間 ${(posNow * 100).toFixed(0)}%)` : `區間中段(${(posNow * 100).toFixed(0)}% 位置)`;
+    let html = `📍 <b>現在的位置</b>:${posTxt}、月線之${aboveNow ? '上' : '下'}|歷史相似日 <b>${sims.length}</b> 個(近三年還原價)`
+      + `<br>🎲 <b>20 日勝率 ${win.toFixed(0)}%</b>(相似位置進場,20 個交易日後收正的比例)`
+      + `<br>🛡 <b>跑多少保險</b>:相似日 20 日內最大回檔——中位 <b>${mae50.toFixed(1)}%</b>、較深的四分之一到 <b>${mae25.toFixed(1)}%</b>。防守設得比 ${mae50.toFixed(1)}% 緊,一半機率被正常波動洗掉;<b>${mae50.toFixed(1)}%~${mae25.toFixed(1)}% 之間</b>是統計上的合理帶`
+      + `<br>💰 <b>停利參考</b>:最大漲幅中位 <b>+${mfe50.toFixed(1)}%</b>、前四分之一到 <b>+${mfe75.toFixed(1)}%</b>——一半案例最多只走到 +${mfe50.toFixed(1)}%,貪過這個數,統計不站你這邊`;
+    if(cost > 0){
+      const pl = (pNow - cost) / cost * 100;
+      html += `<br>💼 <b>你的部位</b>:成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)`
+        + `|以現價回推:統計防守帶 ${fmt(pNow * (1 + mae50 / 100))}~${fmt(pNow * (1 + mae25 / 100))}、停利甜蜜區 ${fmt(pNow * (1 + mfe50 / 100))} 附近`;
+    }
+    html += `<br><span style="opacity:.75;">歷史統計非預測;樣本為此股自身近三年,市場環境改變時分布會失真。非投資建議。</span>`;
+    out.innerHTML = html;
+    track('diag', {stock: d.id, n: sims.length});
+  }catch(e){ out.innerHTML = '診斷失敗(資料源忙線),稍後再試。'; }
+}
+
 // 🧮 反算模式:先決定張數(張起跳的口袋名單/當沖思維)→ 反推成本、跌破防守賠多少、佔總資金風險幾 %
 function calcPosRev(){
   const d = window.__cardD;
-  const out = $('posOut');
+  const out = $('posOutB');
   if(!d || !out) return;
   const price = d.p > 0 ? d.p : 0, stop = Number(d.stop) || 0;
   const lots = Math.max(0, Math.floor(Number(($('posLots').value || '').replace(/,/g, '')) || 0));
@@ -1877,34 +1950,27 @@ function calcPosRev(){
   if(!(price > 0)){ out.textContent = '價格資料還沒好,稍等再按。'; return; }
   if(shares < 1){ out.textContent = '請輸入想買的張數或股數。'; return; }
   try{ localStorage.setItem('posLots', String(lots)); localStorage.setItem('posOdd', String(odd)); }catch(e){}
-  const cap = Number(($('posCap').value || '').replace(/,/g, '')) || 0;
   const cost = shares * price;
+  const $n = v => Math.round(v).toLocaleString('zh-TW');
   const qty = `${lots > 0 ? lots + ' 張' : ''}${odd > 0 ? (lots > 0 ? ' ' : '') + odd + ' 股' : ''}`;
-  let html = `買 <b>${qty}</b> ≈ <b>${Math.round(cost).toLocaleString('zh-TW')} 元</b>`;
-  if(cap > 0) html += `(佔總資金 ${(cost / cap * 100).toFixed(0)}%${cost > cap ? ',<b class="down">超過總資金</b>' : ''})`;
+  const perLot = v => lots > 0 ? `,每張 ${$n(v / shares * 1000)} 元` : '';
+  let html = `<b>${qty}</b> ${d.nm} ≈ <b>${$n(cost)} 元</b>(現價 ${fmt(price)})`;
   if(stop > 0 && stop < price){
-    const loss = shares * (price - stop);
-    html += `<br>跌破防守 ${fmt(stop)} 出場 → 賠 <b class="down">${Math.round(loss).toLocaleString('zh-TW')} 元</b>(股價 -${((price - stop) / price * 100).toFixed(1)}%)`;
-    if(cap > 0){
-      const rp = loss / cap * 100;
-      const tc3 = rp <= 3 ? 'var(--green)' : rp <= 5 ? 'var(--gold)' : 'var(--red)';
-      html += `=總資金的 <b style="color:${tc3};">${rp.toFixed(1)}%</b>${rp > 5 ? '——<b class="down">超過職業風控慣例(1~3%),連賠幾筆就很痛,請自行斟酌</b>' : rp <= 3 ? '——在職業風控範圍內' : '——偏積極'}`;
-    }
-    // 振幅連動:緊防守+這個部位的被洗成本、波段防守版的對照
     const amp = Number(d.amp) || 0, distPct = (price - stop) / price * 100;
+    const tight = amp > 0 && distPct < amp * 0.8;
+    const loss = shares * (price - stop);
+    html += `<br>▍<b>${tight ? '緊防守(當沖用)' : '防守'} ${fmt(stop)}</b>(-${distPct.toFixed(1)}%)→ 賠 <b class="down">${$n(loss)} 元</b>${perLot(loss)}${tight ? `<br><span style="opacity:.8;">　⚠ 距離小於日均振幅 ${amp.toFixed(1)}%,盤中正常晃動就會掃到——盯著盤做才適用</span>` : ''}`;
     const as3 = Number(d.altStop) || 0;
-    if(amp > 0 && distPct < amp * 0.8){
-      html += `<br>🌊 <b class="down">此防守距離 ${distPct.toFixed(1)}% 小於日均振幅 ${amp.toFixed(1)}%</b>——盤中雜訊就可能掃到(當沖可用)`;
-      if(as3 > 0 && as3 < price){
-        const loss2 = shares * (price - as3);
-        html += `;<b>波段版</b>:同部位改守 ${fmt(as3)} → 賠 ${Math.round(loss2).toLocaleString('zh-TW')} 元${cap > 0 ? `(資金 ${(loss2 / cap * 100).toFixed(1)}%)` : ''}——抱得住,但賠得起再抱`;
-      }
+    if(tight && as3 > 0 && as3 < price){
+      const loss2 = shares * (price - as3);
+      html += `<br>▍<b>波段防守 ${fmt(as3)}</b>(-${((price - as3) / price * 100).toFixed(1)}%)→ 賠 <b class="down">${$n(loss2)} 元</b>${perLot(loss2)}<br><span style="opacity:.8;">　✓ 躲得過日常波動,抱得住——但這個數字要先賠得起</span>`;
     }
+    html += `<br>你願意賠哪一種,部位就配哪一種防守——想少賠一點,回上一頁用風險反推張數。`;
   }else{
     html += `<br>目前無有效防守位(破底中)——<b>依紀律此處不進場</b>,這筆部位沒有可衡量的風險下限。`;
   }
   track('position_calc', {stock: d.id, mode: 'rev'});
-  out.innerHTML = html + `<br>非投資建議,計算僅供參考。`;
+  out.innerHTML = html + `<br><span style="opacity:.7;">非投資建議,計算僅供參考。</span>`;
 }
 
 // 🌊 振幅連動:防守距離小於日常波動時,緊防守算出的大部位=被洗出機——同場加映「波段防守版」試算
@@ -3247,17 +3313,29 @@ async function renderAiInsight(stockId, name){
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🎯 <b>進場劇本參考:</b>${ckObj.entry}</p>`
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🛡 <b>防守參考:</b>${ckObj.stop}</p>`
         + `<div style="margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:8px;">`
-        + `<p style="font-weight:700; margin:0 0 6px; font-size:.92rem;">🧮 部位計算器——勝率變成獲利的最後一哩</p>`
+        + `<p style="font-weight:700; margin:0 0 8px; font-size:.92rem;">🧮 部位計算器</p>`
+        + `<div style="display:flex; gap:6px; margin-bottom:8px;">`
+        + `<button id="posTabA" type="button" onclick="posTab('A')">💰 依風險算部位</button>`
+        + `<button id="posTabB" type="button" onclick="posTab('B')">📦 依張數算風險</button></div>`
+        + `<div id="posPaneA">`
         + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem;">總資金`
         + `<input id="posCap" type="text" inputmode="numeric" value="${(localStorage.getItem('posCap') || '500000')}" style="width:100px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
         + `元|單筆願賠 <select id="posRisk" style="padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
         + [['1', '1%(保守)'], ['2', '2%(標準)'], ['3', '3%(積極)'], ['5', '5%(高風險)'], ['10', '10%(危險)']].map(([rv, lb]) => `<option value="${rv}"${(localStorage.getItem('posRisk') || '2') === rv ? ' selected' : ''}>${lb}</option>`).join('')
         + `</select><button onclick="calcPos()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); font-weight:700; cursor:pointer;">算張數</button></div>`
-        + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem; margin-top:8px;">或直接設部位:`
+        + `<p id="posOut" class="hint" style="margin:7px 0 0; line-height:1.7;">先定「這筆最多賠多少」,防守距離決定能買幾張——風險固定,部位浮動。</p></div>`
+        + `<div id="posPaneB" style="display:none;">`
+        + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem;">想買`
         + `<input id="posLots" type="text" inputmode="numeric" value="${(localStorage.getItem('posLots') || '1')}" style="width:52px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">張`
         + `<input id="posOdd" type="text" inputmode="numeric" value="${(localStorage.getItem('posOdd') || '0')}" style="width:60px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">股`
-        + `<button onclick="calcPosRev()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--gold); background:rgba(210,153,34,.12); color:var(--gold); font-weight:700; cursor:pointer;">反算風險</button></div>`
-        + `<p id="posOut" class="hint" style="margin:7px 0 0; line-height:1.7;">防守越近能買越多、防守越遠只能買越少——倉位跟著風險走,凹單就沒戲唱。</p></div>`
+        + `<button onclick="calcPosRev()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--gold); background:rgba(210,153,34,.12); color:var(--gold); font-weight:700; cursor:pointer;">算風險</button></div>`
+        + `<p id="posOutB" class="hint" style="margin:7px 0 0; line-height:1.75;">張起跳/當沖思維:先定部位,直接看「跌破防守賠多少」——兩種防守檔位並排給你選。</p></div></div>`
+        + `<div style="margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:8px;">`
+        + `<p style="font-weight:700; margin:0 0 6px; font-size:.92rem;">🩺 持倉診斷——用這檔自己的三年歷史,回答「現在這個位置」的統計題</p>`
+        + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem;">我的成本價`
+        + `<input id="dxCost" type="text" inputmode="decimal" placeholder="例:${fmt(lastC)}" style="width:90px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
+        + `<button onclick="runDiag()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); font-weight:700; cursor:pointer;">歷史數據診斷</button></div>`
+        + `<p id="dxOut" class="hint" style="margin:7px 0 0; line-height:1.75;">找出歷史上「同位階+同趨勢側」的相似日,統計 20 日勝率、最大回檔與最大漲幅分布——不是預測,是讓歷史當你的參謀。</p></div>`
         + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 分享我的回測戰績卡(IG 限動尺寸)</button>`
         + `<p class="hint" style="margin-top:8px;">依經典順勢規則自動比對日K,僅描述現狀、非投資建議;當沖損益放大,風險自負。</p></div>`;
     }
@@ -3306,6 +3384,7 @@ async function renderAiInsight(stockId, name){
     box.innerHTML = `<div style="margin-bottom:2px;">${pills}<span id="pePill"></span></div><div id="peBox"></div>` + newsHtml + dayHtml + chartHtml
       + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`;
     try{ if(ckObj) drawKChart($('kchart'), s.slice(-45), ckObj); }catch(e){}
+    try{ posTab(localStorage.getItem('posMode') || 'A'); }catch(e){}
     scrollToRes();   // AI 卡把頁面撐高了,重新對準結果區
     // 💰 本益比體檢:背景載入(不擋主渲染=進站更快),算好後塞進膠囊下方
     (async () => {
