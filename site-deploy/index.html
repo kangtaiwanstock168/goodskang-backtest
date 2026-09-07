@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-C|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-D|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-C';
+const APP_VER = 'v20260908-D';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1861,7 +1861,27 @@ function calcPos(){
     + `<br>→ 最多買 <b style="color:var(--accent); font-size:1rem;">${qty}</b>(約 ${Math.round(cost).toLocaleString('zh-TW')} 元,佔資金 ${(cost / cap * 100).toFixed(0)}%——這是進場金額,不是風險;<b>跌破防守砍掉,最多就賠 ${Math.round(Math.min(riskAmt, cost)).toLocaleString('zh-TW')} 元</b>)`
     + (capped ? ';受總資金上限,實際風險已低於設定' : '')
     + warn
+    + ampWarn(d, price, stop, cap, riskAmt)
     + `<br>非投資建議,計算僅供參考。`;
+}
+
+// 🌊 振幅連動:防守距離小於日常波動時,緊防守算出的大部位=被洗出機——同場加映「波段防守版」試算
+function ampWarn(d, price, stop, cap, riskAmt){
+  const amp = Number(d.amp) || 0, distPct = (price - stop) / price * 100;
+  if(!(amp > 0) || distPct >= amp * 0.8) return '';
+  let alt = '';
+  const as2 = Number(d.altStop) || 0;
+  if(as2 > 0 && as2 < price){
+    const per2 = price - as2;
+    let sh2 = Math.floor(riskAmt / per2);
+    const cm2 = Math.floor(cap / price);
+    if(sh2 > cm2) sh2 = cm2;
+    if(sh2 >= 1){
+      const l2 = Math.floor(sh2 / 1000), o2 = sh2 % 1000;
+      alt = `;<b>波段版試算</b>:改用退一層防守 ${fmt(as2)}(距 ${(per2 / price * 100).toFixed(1)}%)→ 最多 <b>${l2 > 0 ? l2 + ' 張' : ''}${o2 > 0 ? (l2 > 0 ? ' ' : '') + o2 + ' 股' : ''}</b>(約 ${Math.round(sh2 * price).toLocaleString('zh-TW')} 元)——部位小一截,但不會被日常波動洗出去`;
+    }
+  }
+  return `<br>🌊 <b class="down">洗出警告:防守距離 ${distPct.toFixed(1)}% 小於近10日平均日振幅 ${amp.toFixed(1)}%</b>——上面算出的大部位配這個緊防守,盤中正常晃動就會把你掃出場(緊防守只適合當沖)${alt}`;
 }
 
 // 📸 限動分享圖卡:把五燈檢查表+標註K線畫成 1080×1920 直式圖,手機直接分享、電腦下載
@@ -2706,6 +2726,17 @@ function taChecklist(s, instNet){
   }
   const recentLow = Math.min(...s.slice(-6, -1).map(b => b.min));
   const shortNote = (trend !== '空頭' && recentLow > lastLow * 1.02) ? `;短線想守緊一點,可用近日回檔低點 ${fmt(recentLow)}` : '';
+  // 🌊 振幅檢核:防守距離小於「近10日平均日振幅×0.8」=雜訊地板之下——盤中正常晃動就會掃到,不是真防守
+  // 觸發時提供「退一層」的波段防守(次一個結構支撐,優先挑距離足夠的)
+  let amp10 = 0;
+  { let a2 = 0, k3 = 0; for(let j3 = Math.max(1, n - 10); j3 < n; j3++){ if(s[j3].close > 0){ a2 += (s[j3].max - s[j3].min) / s[j3].close; k3++; } } if(k3) amp10 = a2 / k3 * 100; }
+  const distPct = (last.close > 0 && lastLow > 0) ? (last.close - lastLow) / last.close * 100 : 0;
+  let altStop = 0, ampNote = '';
+  if(farNote !== 'BREAK' && lastLow > 0 && amp10 > 0 && distPct < amp10 * 0.8){
+    const lower = [trailLow, ma20, lastLowC].filter(x2 => x2 > 0 && x2 < lastLow * 0.999).sort((a3, b3) => b3 - a3);
+    altStop = lower.find(x2 => (last.close - x2) / last.close * 100 >= amp10 * 0.8) || (lower.length ? lower[lower.length - 1] : 0);
+    ampNote = `;🌊 <b>注意:防守距現價僅 ${distPct.toFixed(1)}%,小於近10日平均日振幅 ${amp10.toFixed(1)}%</b>——盤中正常晃動就可能掃到,這個距離只適合當沖的緊出場;<b>波段操作請退一層</b>${altStop ? `用 <b>${fmt(altStop)}</b>(距 ${((last.close - altStop) / last.close * 100).toFixed(1)}%)當防守,部位跟著縮` : ',或等拉回更貼近支撐再進場'}`;
+  }
   const stop = farNote === 'BREAK'
     ? `⚠️ <b>現價 ${fmt(last.close)} 已跌破近期所有低點</b>(近10日低、微回檔底都在現價之上)——正在破底,近距離沒有任何支撐;下一個結構支撐遠在 <b>${fmt(lastLow)}</b>(約 -${((last.close - lastLow) / last.close * 100).toFixed(0)}%)。這種位置做多形同沒有防守——順勢規則的答案:空手不進場,持有者依自己的停損紀律處理,不凹單`
     : trailing
@@ -2732,7 +2763,7 @@ function taChecklist(s, instNet){
     : phase === '作頭'
     ? `🚦 綜合:日K出現<b class="down">作頭疑慮</b>(${score}/${nItems} 綠燈)——反彈不追,短線做多先縮手;跌破 <b>${fmt(lastLow)}</b> 轉空確認。`
     : `🚦 綜合:日K環境<b style="color:var(--gold);">中性</b>(${score}/${nItems} 綠燈)——訊號不齊,短線寧可少做,等綠燈變多。`;
-  return {items, score, nItems, stop, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', nh40};
+  return {items, score, nItems, stop: stop + ampNote, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', nh40, amp10, altStop};
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
@@ -3111,7 +3142,7 @@ async function renderAiInsight(stockId, name){
       const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
       window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, p: lastC, price: fmt(lastC),
         pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
-        stop: ckObj.lastLow, score: ckObj.score, nItems: ckObj.nItems} : null;
+        stop: ckObj.lastLow, amp: ckObj.amp10, altStop: ckObj.altStop, score: ckObj.score, nItems: ckObj.nItems} : null;
     }catch(e){ window.__cardD = null; }
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
