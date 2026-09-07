@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-K|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-H';
+const APP_VER = 'v20260908-K';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1922,17 +1922,75 @@ async function runDiag(){
     const win = rs2.filter(r3 => r3 > 0).length / sims.length * 100;
     const mae50 = q(maes, 0.5) * 100, mae25 = q(maes, 0.25) * 100;   // 25 分位=較深的那端
     const mfe50 = q(mfes, 0.5) * 100, mfe75 = q(mfes, 0.75) * 100;
-    const posTxt = posNow >= 0.8 ? `<b class="up">貼近高點</b>(近半年區間 ${(posNow * 100).toFixed(0)}% 位置)` : posNow <= 0.2 ? `<b class="down">貼近低點</b>(區間 ${(posNow * 100).toFixed(0)}%)` : `區間中段(${(posNow * 100).toFixed(0)}% 位置)`;
-    let html = `📍 <b>現在的位置</b>:${posTxt}、月線之${aboveNow ? '上' : '下'}|歷史相似日 <b>${sims.length}</b> 個(近三年還原價)`
-      + `<br>🎲 <b>20 日勝率 ${win.toFixed(0)}%</b>(相似位置進場,20 個交易日後收正的比例)`
-      + `<br>🛡 <b>跑多少保險</b>:相似日 20 日內最大回檔——中位 <b>${mae50.toFixed(1)}%</b>、較深的四分之一到 <b>${mae25.toFixed(1)}%</b>。防守設得比 ${mae50.toFixed(1)}% 緊,一半機率被正常波動洗掉;<b>${mae50.toFixed(1)}%~${mae25.toFixed(1)}% 之間</b>是統計上的合理帶`
-      + `<br>💰 <b>停利參考</b>:最大漲幅中位 <b>+${mfe50.toFixed(1)}%</b>、前四分之一到 <b>+${mfe75.toFixed(1)}%</b>——一半案例最多只走到 +${mfe50.toFixed(1)}%,貪過這個數,統計不站你這邊`;
-    if(cost > 0){
-      const pl = (pNow - cost) / cost * 100;
-      html += `<br>💼 <b>你的部位</b>:成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)`
-        + `|以現價回推:統計防守帶 ${fmt(pNow * (1 + mae50 / 100))}~${fmt(pNow * (1 + mae25 / 100))}、停利甜蜜區 ${fmt(pNow * (1 + mfe50 / 100))} 附近`;
+    const posTxt = posNow >= 0.8 ? `<b class="up">貼近高點</b>(半年區間 ${(posNow * 100).toFixed(0)}%)` : posNow <= 0.2 ? `<b class="down">貼近低點</b>(區間 ${(posNow * 100).toFixed(0)}%)` : `區間中段(${(posNow * 100).toFixed(0)}%)`;
+    const $n = v => Math.round(v).toLocaleString('zh-TW');
+    const row = (lb, body) => `<div style="display:grid; grid-template-columns:5.2em 1fr; gap:6px; padding:6px 0; border-top:1px solid var(--border); line-height:1.7;"><div style="font-weight:700; color:var(--gold);">${lb}</div><div>${body}</div></div>`;
+    // ── 防守整合:結構防守(檢查表)為主,統計帶(此股三年)當檢核 ──
+    const stopS = Number(d.stop) || 0;
+    const bandHi = pNow * (1 + mae50 / 100), bandLo = pNow * (1 + mae25 / 100);
+    let stopRow;
+    if(stopS > 0 && stopS < pNow){
+      const ds = (pNow - stopS) / pNow * 100;
+      let chk;
+      if(ds < -mae50) chk = `<b class="down">⚠ 比統計中位回檔(${mae50.toFixed(1)}%)還緊</b>——一半機率被正常波動洗掉,當沖可用;抱波段請退到統計帶 ${fmt(bandHi)}~${fmt(bandLo)}${(Number(d.altStop) || 0) > 0 ? ` 或結構次層 ${fmt(d.altStop)}` : ''}`;
+      else if(ds > -mae25) chk = `比統計深尾(${mae25.toFixed(1)}%)還寬——抱得住但賠得偏多,可考慮縮進統計帶 ${fmt(bandHi)}~${fmt(bandLo)}`;
+      else chk = `<b class="up">✓ 落在統計合理帶</b> ${mae50.toFixed(1)}%~${mae25.toFixed(1)}%(${fmt(bandHi)}~${fmt(bandLo)})之內——結構與統計互相印證`;
+      stopRow = `<b>${fmt(stopS)}</b>(-${ds.toFixed(1)}%)<br><span style="font-size:.9em;">${chk}</span>`;
+    }else{
+      stopRow = `<b class="down">目前無有效結構防守(破底中)</b>——統計上相似位置 20 日內還可能回 ${mae50.toFixed(1)}%~${mae25.toFixed(1)}%;依紀律此處不進場`;
     }
-    html += `<br><span style="opacity:.75;">歷史統計非預測;樣本為此股自身近三年,市場環境改變時分布會失真。非投資建議。</span>`;
+    // ── 部位:讀取上方計算器的設定(張數模式或風險模式)──
+    let posRow = '';
+    try{
+      const mode = localStorage.getItem('posMode') || 'A';
+      const capV = Number(($('posCap') ? $('posCap').value : '').replace(/,/g, '')) || 0;
+      const riskV = Number($('posRisk') ? $('posRisk').value : 2) || 2;
+      const lotsV = Math.max(0, Math.floor(Number(($('posLots') ? $('posLots').value : '').replace(/,/g, '')) || 0));
+      const oddV = Math.max(0, Math.floor(Number(($('posOdd') ? $('posOdd').value : '').replace(/,/g, '')) || 0));
+      let sh = 0, how = '';
+      if(mode === 'B'){ sh = lotsV * 1000 + oddV; how = '依張數'; }
+      else if(capV > 0 && stopS > 0 && stopS < pNow){ sh = Math.min(Math.floor(capV * riskV / 100 / (pNow - stopS)), Math.floor(capV / pNow)); how = `依風險 ${riskV}%`; }
+      if(sh >= 1){
+        const lt = Math.floor(sh / 1000), od = sh % 1000;
+        const qty = `${lt > 0 ? lt + ' 張' : ''}${od > 0 ? (lt > 0 ? ' ' : '') + od + ' 股' : ''}`;
+        posRow = `<b>${qty}</b> ≈ ${$n(sh * pNow)} 元(${how})`;
+        if(stopS > 0 && stopS < pNow) posRow += `|跌破防守賠 <b class="down">${$n(sh * (pNow - stopS))} 元</b>${lt > 0 ? `,每張 ${$n((pNow - stopS) * 1000)} 元` : ''}${mode === 'A' && capV > 0 ? `(=資金 ${(sh * (pNow - stopS) / capV * 100).toFixed(1)}%)` : ''}`;
+      }else posRow = `<span style="opacity:.8;">上方計算器還沒設部位——選「依張數」填張數,或「依風險」填總資金,再按一次診斷</span>`;
+    }catch(e){ posRow = ''; }
+    // ── 出場地圖:市場不知道你的成本——只看結構(位階/前高/乖離/量價),三層:硬規則 → 高檔調節區 → 防賣飛 ──
+    const pl = cost > 0 ? (pNow - cost) / cost * 100 : null;
+    let hi120 = 0, hi40 = 0;
+    for(let j = Math.max(0, n2 - 120); j < n2; j++) hi120 = Math.max(hi120, h2[j]);
+    for(let j = Math.max(0, n2 - 40); j < n2; j++) hi40 = Math.max(hi40, h2[j]);
+    const m20now = ma20a[n2 - 1] || 0, dMa = m20now > 0 ? (pNow - m20now) / m20now * 100 : 0;
+    const lastB = bars[n2 - 1];
+    let v5s = 0; for(let j = Math.max(0, n2 - 6); j < n2 - 1; j++) v5s += (bars[j].Trading_Volume || 0);
+    const volXn = v5s > 0 ? (lastB.Trading_Volume || 0) / (v5s / Math.min(5, n2 - 1)) : 0;
+    const blackBig = volXn >= 2 && lastB.close < lastB.open && pNow >= hi40 * 0.97;
+    const nearHi = hi120 > 0 ? (hi120 - pNow) / pNow * 100 : 99;
+    const ext = pNow * (1 + mfe50 / 100);
+    const hardLine = stopS > 0 && stopS < pNow
+      ? `▸ <b>硬規則</b>:收盤跌破移動防守 <b>${fmt(stopS)}</b> 才出場——出場只看結構,不看成本`
+      : `▸ <b>硬規則</b>:目前無有效防守=沒有持倉依據`;
+    const atTop = posNow >= 0.8 || dMa >= 8 || nearHi <= 3;
+    let adjLine;
+    if(atTop){
+      adjLine = `▸ <b style="color:var(--gold);">高檔調節區</b>:現價在區間 ${(posNow * 100).toFixed(0)}%、距區間高點 ${fmt(hi120)} 僅 ${nearHi.toFixed(1)}%${dMa >= 8 ? `、乖離月線 +${dMa.toFixed(1)}%` : ''}——依紀律可<b>分批調節 1/3~1/2</b>,留倉跟移動防守走,<b>不全出</b>`
+        + (blackBig ? `;<b class="down">今日高檔爆量收黑=出貨警訊,調節優先</b>` : '')
+        + `。統計註記:相似位置再漲中位 +${mfe50.toFixed(1)}%(約 ${fmt(ext)})${ext > hi120 ? `,<b>已超過區間高點 ${fmt(hi120)}=要創新高才有這段</b>——${d.nh40 ? '今日帶量創新高,這段有可能' : '沒有帶量創高之前別預設它會到'}` : ''}`;
+    }else{
+      adjLine = `▸ <b>調節區</b>:距區間高點 ${fmt(hi120)} 還有 ${nearHi.toFixed(1)}%,統計再漲中位 +${mfe50.toFixed(1)}%(約 ${fmt(ext)})——接近其一再考慮分批,現在不急`;
+    }
+    const guardLine = `▸ <b>防賣飛</b>:多頭延伸期最貴的錯不是賠錢、是賣飛——沒跌破移動防守、沒出現爆量長黑,就<b>分批不全出</b>${d.nh40 ? ';<b class="up">今日帶量創新高,順勢規則此時不減碼</b>,等第一根收盤跌破 5 日線再處理' : ''}`;
+    const bigWin = (pl != null && pl >= 30) ? `▸ <b>大賺持倉(+${pl.toFixed(0)}%)</b>:時間軸跟短波段不同,上面的統計只是短線天氣;鎖利靠移動防守隨趨勢墊高,不設固定停利價<br>` : '';
+    const exitRow = bigWin + hardLine + '<br>' + adjLine + '<br>' + guardLine;
+    let html = `<div style="margin-top:4px;">`
+      + row('📍 位階', `${posTxt}、月線之${aboveNow ? '上' : '下'}|相似日 ${sims.length} 個 → <b>20 日勝率 ${win.toFixed(0)}%</b>`)
+      + row('🛡 防守', stopRow)
+      + row('📦 部位', posRow)
+      + row('💰 出場', exitRow);
+    if(cost > 0) html += row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${pl <= -8 ? '——<b class="down">已浮虧</b>:若防守早已跌破還抱著,那是凹單不是持倉' : ''}`);
+    html += `</div><span style="opacity:.7; font-size:.85em;">歷史統計非預測;樣本為此股自身近三年,市場環境改變時分布會失真。非投資建議。</span>`;
     out.innerHTML = html;
     track('diag', {stock: d.id, n: sims.length});
   }catch(e){ out.innerHTML = '診斷失敗(資料源忙線),稍後再試。'; }
@@ -3269,7 +3327,7 @@ async function renderAiInsight(stockId, name){
       const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
       window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, p: lastC, price: fmt(lastC),
         pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
-        stop: ckObj.lastLow, amp: ckObj.amp10, altStop: ckObj.altStop, score: ckObj.score, nItems: ckObj.nItems} : null;
+        stop: ckObj.lastLow, amp: ckObj.amp10, altStop: ckObj.altStop, nh40: !!ckObj.nh40, score: ckObj.score, nItems: ckObj.nItems} : null;
     }catch(e){ window.__cardD = null; }
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
@@ -3331,11 +3389,11 @@ async function renderAiInsight(stockId, name){
         + `<button onclick="calcPosRev()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--gold); background:rgba(210,153,34,.12); color:var(--gold); font-weight:700; cursor:pointer;">算風險</button></div>`
         + `<p id="posOutB" class="hint" style="margin:7px 0 0; line-height:1.75;">張起跳/當沖思維:先定部位,直接看「跌破防守賠多少」——兩種防守檔位並排給你選。</p></div></div>`
         + `<div style="margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:8px;">`
-        + `<p style="font-weight:700; margin:0 0 6px; font-size:.92rem;">🩺 持倉診斷——用這檔自己的三年歷史,回答「現在這個位置」的統計題</p>`
+        + `<p style="font-weight:700; margin:0 0 6px; font-size:.92rem;">📋 交易計畫卡——把防守、部位、歷史統計整合成一張(先在上方選好張數或風險)</p>`
         + `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:.88rem;">我的成本價`
         + `<input id="dxCost" type="text" inputmode="decimal" placeholder="例:${fmt(lastC)}" style="width:90px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">`
         + `<button onclick="runDiag()" style="padding:6px 14px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); font-weight:700; cursor:pointer;">歷史數據診斷</button></div>`
-        + `<p id="dxOut" class="hint" style="margin:7px 0 0; line-height:1.75;">找出歷史上「同位階+同趨勢側」的相似日,統計 20 日勝率、最大回檔與最大漲幅分布——不是預測,是讓歷史當你的參謀。</p></div>`
+        + `<p id="dxOut" class="hint" style="margin:7px 0 0; line-height:1.75;">結構防守為主、這檔三年歷史的統計帶當檢核,再接上你的部位——四行看完進場、防守、部位、出場。不是預測,是讓歷史當你的參謀。</p></div>`
         + `<button onclick="makeShareCard()" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(210,153,34,.1); color:var(--gold); font-weight:700; font-size:.95rem; cursor:pointer;">📸 分享我的回測戰績卡(IG 限動尺寸)</button>`
         + `<p class="hint" style="margin-top:8px;">依經典順勢規則自動比對日K,僅描述現狀、非投資建議;當沖損益放大,風險自負。</p></div>`;
     }
