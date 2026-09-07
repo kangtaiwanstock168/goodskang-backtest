@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-D|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-E|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-D';
+const APP_VER = 'v20260908-E';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2763,7 +2763,26 @@ function taChecklist(s, instNet){
     : phase === '作頭'
     ? `🚦 綜合:日K出現<b class="down">作頭疑慮</b>(${score}/${nItems} 綠燈)——反彈不追,短線做多先縮手;跌破 <b>${fmt(lastLow)}</b> 轉空確認。`
     : `🚦 綜合:日K環境<b style="color:var(--gold);">中性</b>(${score}/${nItems} 綠燈)——訊號不齊,短線寧可少做,等綠燈變多。`;
-  return {items, score, nItems, stop: stop + ampNote, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', nh40, amp10, altStop};
+  // 🎯 進場劇本:順勢規則的觸發條件與對應價位——把「什麼情況下才有進場理由」寫成可核對的條件
+  // (條件描述、非指示;跟防守參考同一個哲學:價位是算出來的,決定是你的)
+  let entry = '';
+  const dMa = ma20 > 0 ? (last.close - ma20) / ma20 * 100 : 0;
+  if(farNote === 'BREAK' || trend === '空頭'){
+    entry = `空方環境沒有做多劇本——翻多的第一個條件:<b>收盤站回月線 ${fmt(ma20)} 且月線轉平上彎</b>;在那之前順勢規則的答案是空手等,搶反彈是逆勢行為,要做也是最小部位、最緊出場`;
+  }else if(trend === '轉多'){
+    entry = `轉多確認日通常已是長紅,順勢紀律<b>不追突破當天</b>——劇本:<b>回測頸線 ${fmt(neck)} 不破,出現第一根上漲紅K</b>(收盤>開盤且>昨收)才是規則裡的進場條件;跌回頸線之下=突破失敗,劇本作廢`;
+  }else if(trend === '多頭'){
+    if(nearMA && redUp) entry = `<b>「回後買上漲」條件今日已成立</b>——順勢框架的標準進場樣態就長這樣:防守 ${fmt(lastLow)} 就在腳邊,部位用下方計算器算,跌破就走、不攤平`;
+    else if(dMa >= 5) entry = `現價乖離月線已 <b>+${dMa.toFixed(1)}%</b>,此刻進場=追高——劇本A <b>拉回接</b>:回測月線 ${fmt(ma20)} 附近止跌收紅再核對;劇本B <b>動能續航</b>:收盤帶量(≥1.3×均量)創近 40 日新高${nh40 ? '(<b>今日已觸發 🚀</b>)' : ''}視為趨勢延續。兩個條件都沒出現就等——<b>錯過不是錯,追高被洗才是</b>`;
+    else entry = `多頭延伸、乖離不大——兩個標準觸發條件:①<b>拉回月線 ${fmt(ma20)} 附近不破+收紅上漲</b>(回後買上漲);②<b>收盤帶量創近 40 日新高</b>(🚀 動能訊號,本工具實測樣態)。沒觸發就觀察,順勢者不需要天天出手`;
+  }else if(phase === '打底'){
+    entry = `打底過渡期只有一個劇本:<b>收盤帶量站上頸線 ${fmt(neck)}</b>(距現價 ${last.close < neck ? '+' + ((neck - last.close) / last.close * 100).toFixed(1) + '%' : '已在門口'})=多頭確認,那之前進場都是在賭它會過;跌破第二隻腳=打底失敗、劇本作廢`;
+  }else if(phase === '作頭'){
+    entry = `作頭疑慮中沒有做多劇本——<b>收復前頭 ${Hs.length >= 2 ? fmt(Hs[1].p) : fmt(neck)}</b> 解除警報之前,現金也是一種部位;真要接,等跌破轉空或收復解除,二選一明朗再說`;
+  }else{
+    entry = `盤整區間,順勢者的劇本:<b>收盤帶量突破前波頭 ${fmt(neck)}</b>(距現價 ${last.close < neck ? '+' + ((neck - last.close) / last.close * 100).toFixed(1) + '%' : '門口'})才有進場理由;區間裡殺進殺出,多數時候是幫券商打工`;
+  }
+  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', nh40, amp10, altStop};
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
@@ -3183,6 +3202,7 @@ async function renderAiInsight(stockId, name){
       ckBoxHtml = `<div style="${subBox}"><p style="font-weight:700; margin:0 0 8px; color:var(--gold);">📐 順勢技術檢查表(${ckObj.score}/${ckObj.nItems} 綠燈)</p>`
         + `<p style="margin:0 0 10px; padding:9px 12px; border-radius:8px; font-weight:700; border:1px solid ${bc}; background:${bg}; line-height:1.7;">${ckObj.verdict}</p>`
         + ckObj.items.map(x => `<p style="margin:6px 0; line-height:1.7; font-size:.95rem;">${x.icon} <b>${x.name}:</b>${x.txt}</p>`).join('')
+        + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🎯 <b>進場劇本參考:</b>${ckObj.entry}</p>`
         + `<p style="margin:8px 0 0; line-height:1.7; font-size:.95rem;">🛡 <b>防守參考:</b>${ckObj.stop}</p>`
         + `<div style="margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:8px;">`
         + `<p style="font-weight:700; margin:0 0 6px; font-size:.92rem;">🧮 部位計算器——勝率變成獲利的最後一哩</p>`
