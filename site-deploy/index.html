@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-V|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-X|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-V';
+const APP_VER = 'v20260908-X';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1919,23 +1919,30 @@ async function runDiag(){
     // 距 250 日高點:「反彈回前高附近」跟「創新高噴出段」是兩種行情,不能混——這是審計後補上的第三個相似條件
     const ddHi = i => { let hi = 0; for(let j = Math.max(0, i - 249); j <= i; j++) hi = Math.max(hi, h2[j]); return hi > 0 ? c2[i] / hi - 1 : 0; };
     const ddNow = (() => { let hi = 0; for(let j = Math.max(0, n2 - 250); j < n2; j++) hi = Math.max(hi, h2[j]); return hi > 0 ? pNow / hi - 1 : 0; })();
-    // 相似日掃描(位階帶 ±15pp、月線同側、距前高 ±6pp;不足 30 個就放寬)
-    let band = 0.15, ddBand = 0.06, sims = [];
-    for(let pass = 0; pass < 3 && sims.length < 30; pass++){
+    // 相似日掃描:五階段自適應——先嚴(位階 ±15pp、月線同側、距前高 ±6pp),找不到就逐步放寬;
+    // 放寬到不比距前高時,代表這檔近三年沒有處在同等位置過(例如崩跌 6 成後的盤整),要明講「參考價值打折」
+    const passes = [[0.15, 0.06, true], [0.25, 0.10, true], [0.35, 0.14, true], [0.35, 0, false], [0.50, 0, false]];
+    let sims = [], segN = 0, relaxNote = '';
+    for(let pi = 0; pi < passes.length; pi++){
+      const [band, ddBand, useDd] = passes[pi];
       sims = [];
       for(let i = 130; i < n2 - 21; i++){
         if(Math.abs(pctile(i) - posNow) > band) continue;
         if((c2[i] > ma20a[i]) !== aboveNow) continue;
-        if(Math.abs(ddHi(i) - ddNow) > ddBand) continue;
+        if(useDd && Math.abs(ddHi(i) - ddNow) > ddBand) continue;
         let mae = 0, mfe = 0;
         for(let j = i + 1; j <= i + 20; j++){ mae = Math.min(mae, l2[j] / c2[i] - 1); mfe = Math.max(mfe, h2[j] / c2[i] - 1); }
         sims.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe, i});
       }
-      band += 0.1; ddBand += 0.04;
+      // 獨立段:連續相似日視為同一段行情(間隔 >20 日才算新段)——段數才是真正的證據量
+      segN = 0; let lastI = -99;
+      for(const x2 of sims){ if(x2.i - lastI > 20) segN++; x2.seg = segN; lastI = x2.i; }
+      if(sims.length >= 30 && segN >= 3){
+        if(pi === 1 || pi === 2) relaxNote = `<span style="color:var(--gold);">(相似條件已放寬:位階 ±${Math.round(band * 100)}pp、距前高 ±${Math.round(ddBand * 100)}pp)</span>`;
+        else if(pi >= 3) relaxNote = `<b class="down">(注意:這檔近三年沒有處在同等位置過——找不到距前高相近的歷史,已改用只比位階與月線的鬆條件,樣本來自不同行情,參考價值打折)</b>`;
+        break;
+      }
     }
-    // 獨立段:連續相似日視為同一段行情(間隔 >20 日才算新段)——「191 次」只有 4 段,段數才是真正的證據量
-    let segN = 0, lastI = -99;
-    for(const x2 of sims){ if(x2.i - lastI > 20) segN++; x2.seg = segN; lastI = x2.i; }
     if(sims.length < 15 || segN < 3){ out.innerHTML = `歷史上跟現在同位階、同趨勢側、距前高相近的日子只有 ${sims.length} 個(${segN} 段獨立行情)——樣本太少,統計不可信,此題誠實棄答;請回歸結構防守。`; return; }
     const q = (arr, p3) => { const s3 = [...arr].sort((a2, b2) => a2 - b2); return s3[Math.min(s3.length - 1, Math.floor(s3.length * p3))]; };
     const rs2 = sims.map(x2 => x2.r20), maes = sims.map(x2 => x2.mae), mfes = sims.map(x2 => x2.mfe);
@@ -2006,10 +2013,15 @@ async function runDiag(){
       const cutI = n2 - 250;
       const kC = (cost > 0 && pNow > 0) ? cost / pNow : 0;
       if(used.length >= 15){
-        const hold = (i, e) => c2[i + 60] / e - 1;
-        const trail = w => (i, e) => { let stp = e * (1 - w); for(let j = i + 1; j <= i + 60; j++){ if(c2[j] * (1 - w) > stp) stp = c2[j] * (1 - w); if(c2[j] < stp) return c2[j] / e * (1 - fee) - 1; } return c2[i + 60] / e - 1; };
-        const tp = X => (i, e) => { for(let j = i + 1; j <= i + 60; j++){ if(h2[j] >= e * (1 + X / 100)) return (1 + X / 100) * (1 - fee) - 1; if(c2[j] < e * (1 - ds)) return c2[j] / e * (1 - fee) - 1; } return c2[i + 60] / e - 1; };
-        const reenter = (i, e) => { let pos = true, entry = e, eq = 1; for(let j = i + 1; j <= i + 60; j++){ if(pos){ if(c2[j] < entry * (1 - ds)){ eq *= (c2[j] / entry) * (1 - fee); pos = false; } } else if(c2[j] > ma20a[j] && c2[j - 1] <= ma20a[j - 1]){ entry = c2[j]; pos = true; } } if(pos) eq *= c2[i + 60] / entry; return eq - 1; };
+        // 公平原則:每種規則期末都扣一次來回費稅(含續抱)——否則續抱天生多 0.6 個百分點
+        const hold = (i, e) => c2[i + 60] / e * (1 - fee) - 1;
+        const trail = w => (i, e) => { let stp = e * (1 - w); for(let j = i + 1; j <= i + 60; j++){ if(c2[j] * (1 - w) > stp) stp = c2[j] * (1 - w); if(c2[j] < stp) return c2[j] / e * (1 - fee) - 1; } return c2[i + 60] / e * (1 - fee) - 1; };
+        const tp = X => (i, e) => { for(let j = i + 1; j <= i + 60; j++){ if(h2[j] >= e * (1 + X / 100)) return (1 + X / 100) * (1 - fee) - 1; if(c2[j] < e * (1 - ds)) return c2[j] / e * (1 - fee) - 1; } return c2[i + 60] / e * (1 - fee) - 1; };
+        // 停利再接:到 +X% 賣出,之後從高點回檔 Y% 買回,抱到期末——「先跑一趟再接」的實務做法
+        const tpRe = (X, Y) => (i, e) => { let eq = 1, pos = true, entry = e, sold = 0, hiA = 0; for(let j = i + 1; j <= i + 60; j++){ if(pos){ if(h2[j] >= entry * (1 + X / 100)){ eq *= (1 + X / 100) * (1 - fee); pos = false; sold = entry * (1 + X / 100); hiA = sold; } else if(c2[j] < entry * (1 - ds)){ eq *= (c2[j] / entry) * (1 - fee); pos = false; sold = 0; } } else if(sold > 0){ hiA = Math.max(hiA, c2[j]); if(c2[j] <= hiA * (1 - Y / 100)){ entry = c2[j]; pos = true; sold = 0; } } } if(pos) eq *= c2[i + 60] / entry * (1 - fee); return eq - 1; };
+        // 減半再接:立刻賣一半;那一半等回檔 Y% 買回
+        const halfRe = Y => (i, e) => { const a2 = hold(i, e); let pos = false, entry = 0, hiA = e, eq = (1 - fee); for(let j = i + 1; j <= i + 60; j++){ if(!pos){ hiA = Math.max(hiA, c2[j]); if(c2[j] <= hiA * (1 - Y / 100)){ entry = c2[j]; pos = true; } } } if(pos) eq *= c2[i + 60] / entry * (1 - fee); return (a2 + (eq - 1)) / 2; };
+        const reenter = (i, e) => { let pos = true, entry = e, eq = 1; for(let j = i + 1; j <= i + 60; j++){ if(pos){ if(c2[j] < entry * (1 - ds)){ eq *= (c2[j] / entry) * (1 - fee); pos = false; } } else if(c2[j] > ma20a[j] && c2[j - 1] <= ma20a[j - 1]){ entry = c2[j]; pos = true; } } if(pos) eq *= c2[i + 60] / entry * (1 - fee); return eq - 1; };
         const half = (i, e) => (hold(i, e) + reenter(i, e)) / 2;
         const costHalf = (i, e) => { for(let j = i + 1; j <= i + 60; j++) if(h2[j] >= e * kC) return (kC * (1 - fee) - 1 + hold(i, e)) / 2; return hold(i, e); };
         const costOut = (i, e) => { for(let j = i + 1; j <= i + 60; j++) if(h2[j] >= e * kC) return kC * (1 - fee) - 1; return hold(i, e); };
@@ -2035,6 +2047,9 @@ async function runDiag(){
           {k: 'half', nm: '立即減半保留', s: score(half)}
         ];
         for(const X of [10, 15, 20, 30]) list.push({k: 'tp', p: X, nm: `固定停利 +${X}%`, s: score(tp(X))});
+        // 停利再接掃 X∈{10,15,20}、回檔 Y∈{5,8}:只列最佳的一組;減半再接掃 Y∈{5,8}
+        { let bestRe = null; for(const X of [10, 15, 20]) for(const Y of [5, 8]){ const s5 = score(tpRe(X, Y)); if(!bestRe || s5.rob > bestRe.s.rob) bestRe = {k: 'tpRe', p: X, y: Y, nm: `停利 +${X}% 後回檔 ${Y}% 再接`, s: s5}; } list.push(bestRe); }
+        { let bestH = null; for(const Y of [5, 8]){ const s5 = score(halfRe(Y)); if(!bestH || s5.rob > bestH.s.rob) bestH = {k: 'halfRe', y: Y, nm: `減半、回檔 ${Y}% 再接`, s: s5}; } list.push(bestH); }
         if(kC > 1){ list.push({k: 'costHalf', nm: `漲回成本 ${fmt(cost)} 先減半`, s: score(costHalf)}); list.push({k: 'costOut', nm: `漲回成本 ${fmt(cost)} 全出`, s: score(costOut)}); }
         else if(kC > 0){ list.push({k: 'costGuard', nm: `跌回成本 ${fmt(cost)} 保本出場`, s: score(costGuard)}); }
         // 選擇:穩健分數最高,且最差一段不超過 -15%(安全門檻);沒人過門檻就放寬
@@ -2046,8 +2061,10 @@ async function runDiag(){
         const disagree = holdS.r != null && holdS.e != null && holdS.segE >= 2 && (holdS.r - holdS.e) > 10;
         const reach = X => used.filter(x2 => { const e = c2[x2.i]; for(let j = x2.i + 1; j <= x2.i + 60; j++){ if(h2[j] >= e * (1 + X / 100)) return true; if(c2[j] < e * (1 - ds)) return false; } return false; }).length / used.length * 100;
         const ladder = [5, 10, 15, 20, 30].map(X => [X, reach(X)]);
-        const priceOf = x2 => x2.k === 'trail' ? pNow * (1 - x2.p / 100) : x2.k === 'tp' ? pNow * (1 + x2.p / 100) : x2.k === 'reenter' ? stopS : (x2.k === 'costHalf' || x2.k === 'costOut' || x2.k === 'costGuard') ? cost : 0;
-        sb = {n: used.length, segs: holdS.segR + holdS.segE, best, aggr, holdS, ds, disagree, ladder, priceOf, list};
+        const priceOf = x2 => x2.k === 'trail' ? pNow * (1 - x2.p / 100) : (x2.k === 'tp' || x2.k === 'tpRe') ? pNow * (1 + x2.p / 100) : x2.k === 'reenter' ? stopS : (x2.k === 'costHalf' || x2.k === 'costOut' || x2.k === 'costGuard') ? cost : 0;
+        const bestR = [...list].filter(x2 => x2.s.r != null).sort((a2, b2) => b2.s.r - a2.s.r)[0] || best;
+        const bestE = [...list].filter(x2 => x2.s.e != null).sort((a2, b2) => b2.s.e - a2.s.e)[0] || best;
+        sb = {n: used.length, segs: holdS.segR + holdS.segE, best, aggr, holdS, ds, disagree, ladder, priceOf, list, bestR, bestE};
         const sg3 = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
         const cell = v => `<div class="${v == null ? '' : v >= 0 ? 'up' : 'down'}" style="text-align:right;">${sg3(v)}</div>`;
         const cols = '1fr 4.2em 4.2em 4.2em 4.6em';
@@ -2072,28 +2089,44 @@ async function runDiag(){
       const mod = (blackBig ? ';<b class="down">今日高檔爆量收黑=出貨警訊,先減 1/3</b>' : '') + (d.nh40 ? ';今日帶量創新高,不急著減' : '');
       exitRow = sb ? `<b>獲利 +${pl.toFixed(0)}%</b>——照上方 ★ 規則執行:${sb.best.nm}${sb.best.k === 'hold' ? '(只認防守,跌破才走)' : ''}${mod}` : `<b>獲利 +${pl.toFixed(0)}%</b>——用移動防守鎖利(${stopTxt})${mod}`;
     }
-    // 🎯 出場規則(結論):一個規則、一個價位、兩種行情各多少——數字為主,文字為輔
+    // 🎯 出場規則(結論):先判斷現在是順風還是逆風(用 0050),再給順風首選/逆風首選/不押行情的穩健選——每個都附價位與數字
     let tpRow = '';
     if(sb){
-      const b = sb.best, bp = sb.priceOf(b);
+      let regime = null;
+      try{
+        const bb = await fetchPrices('0050', start2.slice(0, 4) + '-01-01', end2);
+        const bs = (bb || []).filter(b2 => b2.close > 0).sort((a2, b2) => a2.date.localeCompare(b2.date));
+        if(bs.length > 70){
+          const bc = bs.map(b2 => b2.close), bn = bc.length;
+          let s60 = 0; for(let j = bn - 60; j < bn; j++) s60 += bc[j];
+          const m60 = s60 / 60, r60 = bc[bn - 1] / bc[bn - 61] - 1;
+          regime = {tail: bc[bn - 1] > m60 && r60 > 0, r60: r60 * 100, above: bc[bn - 1] > m60};
+        }
+      }catch(e){}
       const sg4 = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
       const toC = v => cost > 0 && v != null ? ((pNow / cost) * (1 + v / 100) - 1) * 100 : null;
-      const how = b.k === 'trail' ? `鎖利價 <b style="font-size:1.15em; color:var(--accent);">${fmt(bp)}</b>(現價回檔 ${b.p}%;價漲它跟著抬,收盤跌破才走)`
-        : b.k === 'tp' ? `到 <b style="font-size:1.15em; color:var(--accent);">${fmt(bp)}</b> 分批停利(+${b.p}%),其餘防守 ${fmt(pNow * (1 - sb.ds))}`
-        : b.k === 'hold' ? `不設停利價,只認防守 <b style="font-size:1.15em; color:var(--accent);">${fmt(pNow * (1 - sb.ds))}</b>(跌破才走)`
-        : b.k === 'reenter' ? `跌破 <b style="font-size:1.15em; color:var(--accent);">${fmt(stopS)}</b> 出場,站回月線再接`
-        : b.k === 'half' ? `現在減半,其餘防守 <b style="font-size:1.15em; color:var(--accent);">${fmt(pNow * (1 - sb.ds))}</b>`
-        : b.k === 'costHalf' ? `漲回 <b style="font-size:1.15em; color:var(--accent);">${fmt(cost)}</b> 先賣一半,其餘續抱`
-        : b.k === 'costOut' ? `漲回 <b style="font-size:1.15em; color:var(--accent);">${fmt(cost)}</b> 全出`
-        : `跌回 <b style="font-size:1.15em; color:var(--accent);">${fmt(cost)}</b> 保本出場`;
-      tpRow = `<div style="font-size:1.02em;"><b>${b.nm}</b> → ${how}</div>`
-        + `<div style="margin-top:4px;">60 天期望 <b class="${b.s.rob >= 0 ? 'up' : 'down'}">${sg4(b.s.rob)}</b>(順風 ${sg4(b.s.r)}/逆風 ${sg4(b.s.e)})|最差一段 <b class="down">${sg4(b.s.worst)}</b>${cost > 0 ? `|對你成本 ${fmt(cost)}:60 天後約 <b class="${toC(b.s.rob) >= 0 ? 'up' : 'down'}">${sg4(toC(b.s.rob))}</b>` : ''}</div>`
-        + (b.k !== 'hold' ? `<div style="margin-top:4px; opacity:.85;">vs 續抱:期望 ${sg4(sb.holdS.rob)}、最差一段 ${sg4(sb.holdS.worst)} → ${sb.holdS.rob > b.s.rob ? `續抱多賺 ${(sb.holdS.rob - b.s.rob).toFixed(1)} 個百分點,代價是最差多賠 ${(b.s.worst - sb.holdS.worst).toFixed(1)}` : '這個規則連期望值都贏續抱'}</div>` : '')
-        + (sb.aggr !== b ? `<div style="margin-top:4px; opacity:.85;">⚡ 賭行情延續的話:${sb.aggr.nm} 期望 ${sg4(sb.aggr.s.rob)},但最差一段 ${sg4(sb.aggr.s.worst)}——賠得起再選</div>` : '');
+      const howOf = x2 => { const bp = sb.priceOf(x2);
+        return x2.k === 'trail' ? `鎖利價 <b style="color:var(--accent);">${fmt(bp)}</b>(回檔 ${x2.p}%,跟漲上抬)`
+        : x2.k === 'tp' ? `到 <b style="color:var(--accent);">${fmt(bp)}</b> 全出(+${x2.p}%)`
+        : x2.k === 'tpRe' ? `到 <b style="color:var(--accent);">${fmt(bp)}</b> 先出(+${x2.p}%),回檔 ${x2.y}% 再接`
+        : x2.k === 'hold' ? `只認防守 <b style="color:var(--accent);">${fmt(pNow * (1 - sb.ds))}</b>`
+        : x2.k === 'reenter' ? `跌破 <b style="color:var(--accent);">${fmt(stopS)}</b> 出,站回月線再接`
+        : x2.k === 'half' ? `現在減半,其餘防守 <b style="color:var(--accent);">${fmt(pNow * (1 - sb.ds))}</b>`
+        : x2.k === 'halfRe' ? `現在減半,回檔 ${x2.y}% 再接回`
+        : x2.k === 'costHalf' ? `漲回 <b style="color:var(--accent);">${fmt(cost)}</b> 先賣一半`
+        : x2.k === 'costOut' ? `漲回 <b style="color:var(--accent);">${fmt(cost)}</b> 全出`
+        : `跌回 <b style="color:var(--accent);">${fmt(cost)}</b> 保本出場`; };
+      const line = (tag, x2, v) => `<div style="margin-top:4px;">${tag} <b>${x2.nm}</b> → ${howOf(x2)}|該情境 60 天 <b class="${v >= 0 ? 'up' : 'down'}">${sg4(v)}</b>${cost > 0 ? `(對你成本 ${sg4(toC(v))})` : ''}|最差段 ${sg4(x2.s.worst)}</div>`;
+      const regTxt = regime ? (regime.tail ? `<b class="up">順風</b>(0050 在季線之上、近 60 日 ${sg4(regime.r60)})` : `<b class="down">逆風</b>(0050 ${regime.above ? '季線上但近 60 日 ' + sg4(regime.r60) : '跌破季線'})`) : '無法判定';
+      tpRow = `<div>現在大盤行情:${regTxt}——${regime ? (regime.tail ? '順風劇本較可能,但逆風劇本要先想好' : '逆風劇本優先') : '兩個劇本並列'}</div>`
+        + line(regime && regime.tail ? '▶ 順風劇本(行情延續)' : '　順風劇本(行情延續)', sb.bestR, sb.bestR.s.r)
+        + line(regime && !regime.tail ? '▶ 逆風劇本(行情不延續)' : '　逆風劇本(行情不延續)', sb.bestE, sb.bestE.s.e)
+        + `<div style="margin-top:4px;">★ 不押行情(兩者平均、最差段 ≤ -15%) <b>${sb.best.nm}</b> → ${howOf(sb.best)}|穩健 <b class="${sb.best.s.rob >= 0 ? 'up' : 'down'}">${sg4(sb.best.s.rob)}</b>${cost > 0 ? `(對你成本 ${sg4(toC(sb.best.s.rob))})` : ''}|最差段 ${sg4(sb.best.s.worst)}</div>`
+        + (sb.bestE.k !== 'hold' && sb.bestE.s.e > sb.holdS.e ? `<div style="margin-top:4px; opacity:.85;">逆風時「先跑」確實贏續抱 ${(sb.bestE.s.e - sb.holdS.e).toFixed(1)} 個百分點;順風時續抱贏 ${(sb.holdS.r - sb.bestE.s.r).toFixed(1)}——先跑對不對,取決於行情有沒有延續</div>` : '');
     }
     let html = `<div style="margin-top:4px;">`
       + row('📍 位階', `${posTxt}、月線之${aboveNow ? '上' : '下'}、距一年高點 ${(ddNow * 100).toFixed(1)}%`)
-      + row('📊 股性', `歷史上同狀態 ${segN} 段行情(${sims.length} 個交易日),之後 20 天內:<b>上漲機率 ${win.toFixed(0)}%</b>|平常回檔 <b>${mae50.toFixed(1)}%</b>、較深時到 ${mae25.toFixed(1)}%|通常再漲 <b>+${mfe50.toFixed(1)}%</b>、強一點到 +${mfe75.toFixed(1)}%<br><span style="font-size:.9em;">防守比 ${mae50.toFixed(1)}% 緊=一半機率被洗;期待超過 +${mfe50.toFixed(1)}%=統計不站你這邊${pNow * (1 + mfe50 / 100) > hi120 ? `(+${mfe50.toFixed(1)}% 已超過區間高點 ${fmt(hi120)},要創新高才有)` : ''}</span>`)
+      + row('📊 股性', `歷史上同狀態 ${segN} 段行情(${sims.length} 個交易日)${relaxNote},之後 20 天內:<b>上漲機率 ${win.toFixed(0)}%</b>|平常回檔 <b>${mae50.toFixed(1)}%</b>、較深時到 ${mae25.toFixed(1)}%|通常再漲 <b>+${mfe50.toFixed(1)}%</b>、強一點到 +${mfe75.toFixed(1)}%<br><span style="font-size:.9em;">防守比 ${mae50.toFixed(1)}% 緊=一半機率被洗;期待超過 +${mfe50.toFixed(1)}%=統計不站你這邊${pNow * (1 + mfe50 / 100) > hi120 ? `(+${mfe50.toFixed(1)}% 已超過區間高點 ${fmt(hi120)},要創新高才有)` : ''}</span>`)
       + row('🛡 防守', stopRow)
       + row('📦 部位', posRow)
       + (cost > 0 ? row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${legacy ? '・<b style="color:var(--gold);">解套中長線單</b>' : ''}${splitNote2 ? `<br><span style="font-size:.85em; opacity:.75;">${splitNote2}</span>` : ''}`) : '')
