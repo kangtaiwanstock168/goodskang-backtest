@@ -358,7 +358,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-M|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-N|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -380,7 +380,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-M';
+const APP_VER = 'v20260909-N';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2051,7 +2051,8 @@ async function runDiag(o){
       for(const ev of evs2) if(ev.factor <= 0.5 && ev.date >= cut) splitNote2 = `(${ev.date.slice(5).replace('-', '/')} 分割 1拆${Math.round(1 / ev.factor)},分割前價格已還原)`;
     }catch(e){}
     const n2 = bars.length;
-    if(n2 < 260){ out.innerHTML = '歷史資料不足三百根 K,樣本太少不硬算——新股請以結構與防守紀律為主。'; return; }
+    if(n2 < 90){ out.innerHTML = `上市未滿 90 個交易日(目前 ${n2} 根 K),連一段像樣的歷史都沒有——以結構防守為主。`; return; }
+    const i0 = Math.min(130, Math.max(61, n2 - 21 - 80));   // 新股/新 ETF:歷史短就從能算的地方開始,不鎖答案
     const c2 = bars.map(b2 => b2.close), h2 = bars.map(b2 => b2.max), l2 = bars.map(b2 => b2.min);
     const ma20a = new Array(n2).fill(0); let sm = 0;
     for(let i = 0; i < n2; i++){ sm += c2[i]; if(i >= 20) sm -= c2[i - 20]; if(i >= 19) ma20a[i] = sm / 20; }
@@ -2111,7 +2112,7 @@ async function runDiag(o){
     for(let pi = 0; pi < passes.length; pi++){
       const [band, ddBand, useDd, useReg] = passes[pi];
       sims = [];
-      for(let i = 130; i < n2 - 21; i++){
+      for(let i = i0; i < n2 - 21; i++){
         if(useReg && regArr[i] !== regNow) continue;
         if(Math.abs(pctile(i) - posNow) > band) continue;
         if(!nearMa && (c2[i] > ma20a[i]) !== aboveNow) continue;
@@ -2132,7 +2133,8 @@ async function runDiag(o){
         break;
       }
     }
-    if(sims.length < 15 || segN < 3){ out.innerHTML = `歷史上跟現在同位階、同趨勢側、距前高相近的日子只有 ${sims.length} 個(${segN} 段獨立行情)——樣本太少,統計不可信,此題誠實棄答;請回歸結構防守。`; return; }
+    if(sims.length < 5){ out.innerHTML = `歷史上跟現在同狀態的日子只有 ${sims.length} 個——連參考都算不出來,以結構防守為主。`; return; }
+    if(sims.length < 30 || segN < 3) relaxNote += `<span class="dxTag" style="color:var(--gold);">⚠ 樣本偏少(${sims.length} 日・${segN} 段),結果自行斟酌</span>`;
     const q = (arr, p3) => { const s3 = [...arr].sort((a2, b2) => a2 - b2); return s3[Math.min(s3.length - 1, Math.floor(s3.length * p3))]; };
     const rs2 = sims.map(x2 => x2.r20), maes = sims.map(x2 => x2.mae), mfes = sims.map(x2 => x2.mfe);
     const win = rs2.filter(r3 => r3 > 0).length / sims.length * 100;
@@ -2200,7 +2202,7 @@ async function runDiag(o){
       const used = sims.filter(x2 => x2.i < n2 - 21);   // 20 天視角:短線的人要的是接下來一個月
       const cutI = n2 - 250;
       const kC = (!o.buyNow && cost > 0 && pNow > 0) ? cost / pNow : 0;   // 現價買入:沒有「回成本」這條線
-      if(used.length >= 15){
+      if(used.length >= 5){
         const hold = (i, e) => c2[i + 20] / e * (1 - fee) - 1;
         const stopOut = (i, e) => { for(let j = i + 1; j <= i + 20; j++) if(c2[j] < e * (1 - ds)) return c2[j] / e * (1 - fee) - 1; return hold(i, e); };
         const reenter = (i, e) => { let pos = true, entry = e, eq = 1; for(let j = i + 1; j <= i + 20; j++){ if(pos){ if(c2[j] < entry * (1 - ds)){ eq *= (c2[j] / entry) * (1 - fee); pos = false; } } else if(c2[j] > ma20a[j] && c2[j - 1] <= ma20a[j - 1]){ entry = c2[j]; pos = true; } } if(pos) eq *= c2[i + 20] / entry * (1 - fee); return eq - 1; };
