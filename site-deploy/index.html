@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260908-X|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260908-Z|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260908-X';
+const APP_VER = 'v20260908-Z';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1935,8 +1935,8 @@ async function runDiag(){
         sims.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe, i});
       }
       // 獨立段:連續相似日視為同一段行情(間隔 >20 日才算新段)——段數才是真正的證據量
-      segN = 0; let lastI = -99;
-      for(const x2 of sims){ if(x2.i - lastI > 20) segN++; x2.seg = segN; lastI = x2.i; }
+      segN = 0; let lastI = -99, segLen = 0;
+      for(const x2 of sims){ if(x2.i - lastI > 20 || segLen >= 20){ segN++; segLen = 0; } x2.seg = segN; segLen++; lastI = x2.i; }
       if(sims.length >= 30 && segN >= 3){
         if(pi === 1 || pi === 2) relaxNote = `<span style="color:var(--gold);">(相似條件已放寬:位階 ±${Math.round(band * 100)}pp、距前高 ±${Math.round(ddBand * 100)}pp)</span>`;
         else if(pi >= 3) relaxNote = `<b class="down">(注意:這檔近三年沒有處在同等位置過——找不到距前高相近的歷史,已改用只比位階與月線的鬆條件,樣本來自不同行情,參考價值打折)</b>`;
@@ -2048,7 +2048,7 @@ async function runDiag(){
         ];
         for(const X of [10, 15, 20, 30]) list.push({k: 'tp', p: X, nm: `固定停利 +${X}%`, s: score(tp(X))});
         // 停利再接掃 X∈{10,15,20}、回檔 Y∈{5,8}:只列最佳的一組;減半再接掃 Y∈{5,8}
-        { let bestRe = null; for(const X of [10, 15, 20]) for(const Y of [5, 8]){ const s5 = score(tpRe(X, Y)); if(!bestRe || s5.rob > bestRe.s.rob) bestRe = {k: 'tpRe', p: X, y: Y, nm: `停利 +${X}% 後回檔 ${Y}% 再接`, s: s5}; } list.push(bestRe); }
+        { let bestRe = null; for(const X of [10, 20, 30, 50]) for(const Y of [8, 15, 30]){ const s5 = score(tpRe(X, Y)); if(!bestRe || s5.rob > bestRe.s.rob) bestRe = {k: 'tpRe', p: X, y: Y, nm: `停利 +${X}% 後回檔 ${Y}% 再接`, s: s5}; } list.push(bestRe); }
         { let bestH = null; for(const Y of [5, 8]){ const s5 = score(halfRe(Y)); if(!bestH || s5.rob > bestH.s.rob) bestH = {k: 'halfRe', y: Y, nm: `減半、回檔 ${Y}% 再接`, s: s5}; } list.push(bestH); }
         if(kC > 1){ list.push({k: 'costHalf', nm: `漲回成本 ${fmt(cost)} 先減半`, s: score(costHalf)}); list.push({k: 'costOut', nm: `漲回成本 ${fmt(cost)} 全出`, s: score(costOut)}); }
         else if(kC > 0){ list.push({k: 'costGuard', nm: `跌回成本 ${fmt(cost)} 保本出場`, s: score(costGuard)}); }
@@ -2064,16 +2064,23 @@ async function runDiag(){
         const priceOf = x2 => x2.k === 'trail' ? pNow * (1 - x2.p / 100) : (x2.k === 'tp' || x2.k === 'tpRe') ? pNow * (1 + x2.p / 100) : x2.k === 'reenter' ? stopS : (x2.k === 'costHalf' || x2.k === 'costOut' || x2.k === 'costGuard') ? cost : 0;
         const bestR = [...list].filter(x2 => x2.s.r != null).sort((a2, b2) => b2.s.r - a2.s.r)[0] || best;
         const bestE = [...list].filter(x2 => x2.s.e != null).sort((a2, b2) => b2.s.e - a2.s.e)[0] || best;
-        sb = {n: used.length, segs: holdS.segR + holdS.segE, best, aggr, holdS, ds, disagree, ladder, priceOf, list, bestR, bestE};
+        sb = {n: used.length, segs: holdS.segR + holdS.segE, best, aggr, holdS, ds, disagree, ladder, priceOf, list, bestR, bestE, lastSeg: null};
         const sg3 = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
         const cell = v => `<div class="${v == null ? '' : v >= 0 ? 'up' : 'down'}" style="text-align:right;">${sg3(v)}</div>`;
-        const cols = '1fr 4.2em 4.2em 4.2em 4.6em';
-        const tr = x2 => `<div style="display:grid; grid-template-columns:${cols}; gap:4px; padding:3px 0; ${x2 === best ? 'color:var(--text); font-weight:700; background:rgba(88,166,255,.08); border-radius:4px;' : x2 === aggr && aggr !== best ? 'opacity:.95;' : 'opacity:.75;'}"><div>${x2 === best ? '★ ' : x2 === aggr && aggr !== best ? '⚡ ' : ''}${x2.nm}</div>${cell(x2.s.r)}${cell(x2.s.e)}${cell(x2.s.rob)}${cell(x2.s.worst)}</div>`;
-        sbRow = `<div style="font-size:.9em;">同狀態 <b>${sb.segs} 段</b>行情(近1年 ${holdS.segR} 段、更早 ${holdS.segE} 段),往後 60 天各種出場規則:`
-          + `<div style="display:grid; grid-template-columns:${cols}; gap:4px; padding:4px 0; opacity:.6; font-size:.85em;"><div>規則</div><div style="text-align:right;">順風</div><div style="text-align:right;">逆風</div><div style="text-align:right;">穩健</div><div style="text-align:right;">最差段</div></div>`
+        const toC2 = v => (cost > 0 && v != null) ? ((pNow / cost) * (1 + v / 100) - 1) * 100 : null;
+        const cols = cost > 0 ? '1fr 4em 4em 4em 4.4em 4.4em' : '1fr 4.2em 4.2em 4.2em 4.6em';
+        const tr = x2 => `<div style="display:grid; grid-template-columns:${cols}; gap:4px; padding:3px 0; ${x2 === best ? 'color:var(--text); font-weight:700; background:rgba(88,166,255,.08); border-radius:4px;' : x2 === aggr && aggr !== best ? 'opacity:.95;' : 'opacity:.75;'}"><div>${x2 === best ? '★ ' : x2 === aggr && aggr !== best ? '⚡ ' : ''}${x2.nm}</div>${cell(x2.s.r)}${cell(x2.s.e)}${cell(x2.s.rob)}${cost > 0 ? cell(toC2(x2.s.rob)) : ''}${cell(x2.s.worst)}</div>`;
+        // 各段實況:每一段的起訖、續抱 60 天結果、60 天內最深回檔——看得到六月那種「最後有回來但中間先摔 30%」
+        const segMap = {};
+        for(const x2 of used){ const sgm = segMap[x2.seg] = segMap[x2.seg] || {from: bars[x2.i].date, r: [], dd: []}; sgm.to = bars[x2.i].date; sgm.r.push(hold(x2.i, c2[x2.i])); let m3 = 0; for(let j = x2.i + 1; j <= x2.i + 60; j++) m3 = Math.min(m3, l2[j] / c2[x2.i] - 1); sgm.dd.push(m3); }
+        { const arr9 = Object.values(segMap); const lg = arr9[arr9.length - 1]; if(lg) sb.lastSeg = {from: lg.from, to: lg.to, r: lg.r.reduce((a2, b2) => a2 + b2, 0) / lg.r.length * 100, dd: Math.min(...lg.dd) * 100, last: lg.r[lg.r.length - 1] * 100}; }
+        const segLine = Object.values(segMap).map(sgm => { const r4 = sgm.r.reduce((a2, b2) => a2 + b2, 0) / sgm.r.length * 100, d4 = Math.min(...sgm.dd) * 100; return `<span style="white-space:nowrap;">${sgm.from.slice(2, 7)}~${sgm.to.slice(5, 10)} <b class="${r4 >= 0 ? 'up' : 'down'}">${sg3(r4)}</b><span style="opacity:.7;">(最深 ${d4.toFixed(0)}%)</span></span>`; }).join('|');
+        sbRow = `<details style="font-size:.9em;"><summary style="cursor:pointer; color:var(--accent);">看完整沙盤(${list.length} 種出場規則、各段實況)</summary><div style="margin-top:6px;">同狀態 <b>${sb.segs} 段</b>行情(近1年 ${holdS.segR} 段、更早 ${holdS.segE} 段;每段最長 20 個交易日),往後 60 天各種出場規則:`
+          + `<div style="display:grid; grid-template-columns:${cols}; gap:4px; padding:4px 0; opacity:.6; font-size:.85em;"><div>規則</div><div style="text-align:right;">順風</div><div style="text-align:right;">逆風</div><div style="text-align:right;">穩健</div>${cost > 0 ? '<div style="text-align:right;">對你成本</div>' : ''}<div style="text-align:right;">最差段</div></div>`
           + [...list].sort((a2, b2) => b2.s.rob - a2.s.rob).map(tr).join('')
+          + `<div style="margin-top:6px; line-height:1.9;">各段續抱 60 天實況:${segLine}</div>`
           + `<div style="margin-top:6px; color:var(--text);">順風=近 1 年行情|逆風=更早行情|穩健=兩者平均|最差段=最糟的一段。<b>★ 穩健最高且最差段不超過 -15%</b>${aggr !== best ? `;⚡ 不設門檻的最高者(${aggr.nm},代價是最差段 ${sg3(aggr.s.worst)})` : ''}。含來回費稅 0.585%${disagree ? `;<b class="down">近 1 年與更早結論差很大(續抱 ${sg3(holdS.r)} vs ${sg3(holdS.e)})</b>,所以用穩健分數選` : ''}</div>`
-          + `<div style="margin-top:6px;">🪜 60 天內、跌破防守前曾漲到:${ladder.map(([X, p]) => `+${X}% <b>${p.toFixed(0)}%</b>`).join('|')}</div></div>`;
+          + `<div style="margin-top:6px;">🪜 60 天內、跌破防守前曾漲到:${ladder.map(([X, p]) => `+${X}% <b>${p.toFixed(0)}%</b>`).join('|')}</div></div></details>`;
       }
     }
     let exitRow;
@@ -2116,13 +2123,16 @@ async function runDiag(){
         : x2.k === 'costHalf' ? `漲回 <b style="color:var(--accent);">${fmt(cost)}</b> 先賣一半`
         : x2.k === 'costOut' ? `漲回 <b style="color:var(--accent);">${fmt(cost)}</b> 全出`
         : `跌回 <b style="color:var(--accent);">${fmt(cost)}</b> 保本出場`; };
-      const line = (tag, x2, v) => `<div style="margin-top:4px;">${tag} <b>${x2.nm}</b> → ${howOf(x2)}|該情境 60 天 <b class="${v >= 0 ? 'up' : 'down'}">${sg4(v)}</b>${cost > 0 ? `(對你成本 ${sg4(toC(v))})` : ''}|最差段 ${sg4(x2.s.worst)}</div>`;
-      const regTxt = regime ? (regime.tail ? `<b class="up">順風</b>(0050 在季線之上、近 60 日 ${sg4(regime.r60)})` : `<b class="down">逆風</b>(0050 ${regime.above ? '季線上但近 60 日 ' + sg4(regime.r60) : '跌破季線'})`) : '無法判定';
-      tpRow = `<div>現在大盤行情:${regTxt}——${regime ? (regime.tail ? '順風劇本較可能,但逆風劇本要先想好' : '逆風劇本優先') : '兩個劇本並列'}</div>`
-        + line(regime && regime.tail ? '▶ 順風劇本(行情延續)' : '　順風劇本(行情延續)', sb.bestR, sb.bestR.s.r)
-        + line(regime && !regime.tail ? '▶ 逆風劇本(行情不延續)' : '　逆風劇本(行情不延續)', sb.bestE, sb.bestE.s.e)
-        + `<div style="margin-top:4px;">★ 不押行情(兩者平均、最差段 ≤ -15%) <b>${sb.best.nm}</b> → ${howOf(sb.best)}|穩健 <b class="${sb.best.s.rob >= 0 ? 'up' : 'down'}">${sg4(sb.best.s.rob)}</b>${cost > 0 ? `(對你成本 ${sg4(toC(sb.best.s.rob))})` : ''}|最差段 ${sg4(sb.best.s.worst)}</div>`
-        + (sb.bestE.k !== 'hold' && sb.bestE.s.e > sb.holdS.e ? `<div style="margin-top:4px; opacity:.85;">逆風時「先跑」確實贏續抱 ${(sb.bestE.s.e - sb.holdS.e).toFixed(1)} 個百分點;順風時續抱贏 ${(sb.holdS.r - sb.bestE.s.r).toFixed(1)}——先跑對不對,取決於行情有沒有延續</div>` : '');
+      const sg5 = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+      const trimPrice = Math.min(hi120, pNow * (1 + mfe50 / 100));
+      const trailPx = sb.bestE && sb.bestE.k === 'trail' ? sb.priceOf(sb.bestE) : pNow * (1 - sb.ds);
+      const trailW = sb.bestE && sb.bestE.k === 'trail' ? sb.bestE.p : Math.round(sb.ds * 100);
+      const ls = sb.lastSeg;
+      const regTxt = regime ? (regime.tail ? `<b class="up">順風</b>(0050 季線上、近 60 日 ${sg5(regime.r60)})` : `<b class="down">逆風</b>(0050 ${regime.above ? '近 60 日 ' + sg5(regime.r60) : '跌破季線'})`) : '無法判定';
+      tpRow = (ls ? `<div>🕰 <b>上次在這個位置</b>(${ls.from.slice(5).replace('-', '/')}~${ls.to.slice(5).replace('-', '/')}):抱 60 天 <b class="${ls.r >= 0 ? 'up' : 'down'}">${sg5(ls.r)}</b>,中間最深 <b class="down">${ls.dd.toFixed(0)}%</b>——這是最像現在的一次,比三年平均更值得看</div>` : '')
+        + `<div style="margin-top:6px;">🎯 <b>部分停利價 <span style="font-size:1.15em; color:var(--accent);">${fmt(trimPrice)}</span></b>(${trimPrice >= hi120 - 0.001 ? '區間高點' : '統計再漲空間 +' + mfe50.toFixed(0) + '%'};現價 ${sg5((trimPrice / pNow - 1) * 100)}${cost > 0 ? `,對你成本 ${sg5((trimPrice / cost - 1) * 100)}` : ''})——到了先出 1/3~1/2,不全出</div>`
+        + `<div style="margin-top:4px;">🛡 <b>全出鎖利價 <span style="font-size:1.15em; color:var(--accent);">${fmt(trailPx)}</span></b>(移動鎖利 ${trailW}%,價漲跟著抬;現價 ${sg5((trailPx / pNow - 1) * 100)}${cost > 0 ? `,對你成本 ${sg5((trailPx / cost - 1) * 100)}` : ''})——收盤跌破全出,不猜底</div>`
+        + `<div style="margin-top:6px; font-size:.92em;">現在大盤:${regTxt}。順風劇本=${sb.bestR.nm}(60 天 ${sg5(sb.bestR.s.r)}、最差 ${sg5(sb.bestR.s.worst)});逆風劇本=${sb.bestE.nm}(${sg5(sb.bestE.s.e)}、最差 ${sg5(sb.bestE.s.worst)});不押行情=${sb.best.nm}(穩健 ${sg5(sb.best.s.rob)})</div>`;
     }
     let html = `<div style="margin-top:4px;">`
       + row('📍 位階', `${posTxt}、月線之${aboveNow ? '上' : '下'}、距一年高點 ${(ddNow * 100).toFixed(1)}%`)
@@ -2130,9 +2140,9 @@ async function runDiag(){
       + row('🛡 防守', stopRow)
       + row('📦 部位', posRow)
       + (cost > 0 ? row('💼 持倉', `成本 ${fmt(cost)} → 現價 ${fmt(pNow)}(<b class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : ''}${pl.toFixed(1)}%</b>)${legacy ? '・<b style="color:var(--gold);">解套中長線單</b>' : ''}${splitNote2 ? `<br><span style="font-size:.85em; opacity:.75;">${splitNote2}</span>` : ''}`) : '')
-      + (sbRow ? row('🧪 沙盤', sbRow) : '')
-      + (sb ? row('🎯 出場規則', tpRow) : '')
-      + row('💼 你的狀態', exitRow);
+      + (sb ? row('🎯 結論', tpRow) : '')
+      + row('💼 你的狀態', exitRow)
+      + (sbRow ? row('🧪 沙盤', sbRow) : '');
     html += `</div><span style="opacity:.7; font-size:.85em;">歷史統計非預測;樣本為此股自身近三年,市場環境改變時分布會失真。非投資建議。</span>`;
     out.innerHTML = html;
     track('diag', {stock: d.id, n: sims.length});
