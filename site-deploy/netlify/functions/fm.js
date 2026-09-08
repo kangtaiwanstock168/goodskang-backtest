@@ -1,9 +1,9 @@
-// FinMind 資料代理備援:使用者 IP 被 FinMind 限流時,改由本站伺服器代抓
+// FinMind 資料代理備援 v2:使用者 IP 被 FinMind 限流時,改由本站伺服器代抓(白名單加法人/新聞/財報,否則直連被擋時這三區會整個消失)
 // 僅放行白名單參數,避免被當開放代理濫用。© 2026 阿康(goodskang)
 exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   const allowed = ['dataset', 'data_id', 'start_date', 'end_date'];
-  const okDatasets = ['TaiwanStockPrice', 'TaiwanStockInfo', 'TaiwanStockSplitPrice', 'TaiwanStockDividendResult'];
+  const okDatasets = ['TaiwanStockPrice', 'TaiwanStockInfo', 'TaiwanStockSplitPrice', 'TaiwanStockDividendResult', 'TaiwanStockInstitutionalInvestorsBuySell', 'TaiwanStockNews', 'TaiwanStockFinancialStatements'];
   const p = new URLSearchParams();
   for(const k of allowed) if(q[k]) p.set(k, String(q[k]).slice(0, 40));
   if(!okDatasets.includes(p.get('dataset') || '') || !p.get('data_id')){
