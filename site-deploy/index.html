@@ -97,6 +97,10 @@
   .best-box h3{color:var(--gold); font-size:1rem; margin-bottom:8px;}
   .best-box p{font-size:.92rem; line-height:1.7;}
   #results{display:none;}
+  .modeBtn{padding:12px 10px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); font-weight:700; font-size:1rem; cursor:pointer; line-height:1.5; text-align:center;}
+  .modeBtn span{display:block; font-weight:400; font-size:.8rem; color:var(--muted); margin-top:2px;}
+  .modeBtn.on{border-color:var(--accent); background:rgba(88,166,255,.14); color:var(--accent);}
+  .modeBtn.on span{color:var(--accent); opacity:.85;}
   /* 效能:結果頁很長,離開視窗的卡片先不渲染(捲到才畫)——首屏不再卡頓 */
   #results > *:not(:first-child){content-visibility:auto; contain-intrinsic-size:auto 600px;}
   .chart-wrap{position:relative; height:380px;}
@@ -153,14 +157,15 @@
     <h1>📈 阿康的台股 <span>AI 作戰室</span></h1>
     <p>每檔股票都有自己的股性——短線有短線的戲,長線有長線的答案。<br>
     今天誰在噴、這檔現在什麼狀態、長期怎麼買最划算——一站看完。</p>
-    <div style="margin:14px auto 0; max-width:640px; border:1px solid var(--gold); border-radius:12px; padding:12px 18px; background:rgba(210,153,34,.08);">
-      <p style="color:var(--text); font-weight:700; font-size:1.02rem; line-height:1.9;">你是哪一種投資人?這裡都有你的武器<br>
-      <span style="color:var(--gold);">⚡ 短線當沖:盤後強勢股雷達+五燈檢查表(趨勢/均線/量價/法人/防守)<br>
-      📈 波段操作:AI 標註 K 線、頸線與移動防守、盤中即時動能<br>
-      🐢 長期存股:六種策略回測、定期定額 vs 單筆、真實年化 IRR</span><br>
-      <span style="color:var(--accent);">✦ 免費・免註冊・手機電腦都能用 ✦</span></p>
+    <div id="modeBar" style="margin:14px auto 0; max-width:720px;">
+      <p style="color:var(--text); font-weight:700; margin:0 0 8px;">今天想做什麼?</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px;">
+        <button type="button" class="modeBtn" data-mode="hot" onclick="setMode('hot')">🔥 找熱門股<br><span>今天誰在噴、新聞在追誰</span></button>
+        <button type="button" class="modeBtn" data-mode="one" onclick="setMode('one')">🎯 看一檔怎麼進出<br><span>五燈+進出點+持倉計畫卡</span></button>
+        <button type="button" class="modeBtn" data-mode="long" onclick="setMode('long')">🐢 存股回測<br><span>六種策略、定期定額、年化 IRR</span></button>
+      </div>
     </div>
-    <p style="margin-top:12px;">不報明牌、不喊進出——把數據攤開,你自己做決定。</p>
+    <p style="margin-top:12px;">不報明牌、不喊進出——把數據攤開,你自己做決定。免費・免註冊。</p>
   </header>
 
   <div class="card" id="watchBoard" style="display:none;"></div>
@@ -328,7 +333,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-I|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +355,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-H';
+const APP_VER = 'v20260909-I';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -603,16 +608,8 @@ function updateDcaHint(){
   $('dcaCount').value = 3;
   $('dcaAmount').value = '10,000';
   updateDcaHint();
-  // 進站排序:話題雷達(新聞熱股+價格)最先 → 表單(代號+開始分析) → 強勢雷達/觀察站(回訪者觀察站優先)
-  try{
-    const wb = $('watchBoard'), cont = wb.parentNode;
-    const formCard = $('stockId').closest('.card');
-    cont.insertBefore(formCard, wb);            // 表單移到觀察站前
-    cont.insertBefore($('topicCard'), formCard); // 話題雷達壓在最前——進站第一眼就是熱門新聞股+紅綠價格
-    if(!loadWatch().length){                     // 新客:強勢雷達排在觀察站前
-      cont.insertBefore($('radarCard'), wb);
-    }
-  }catch(e){}
+  // 模式化排序:找熱門股=雷達優先;看一檔=表單優先(結果緊接);存股回測=表單優先+完整回測展開。模式記在 localStorage,分享連結一律進「看一檔」
+  try{ applyModeOrder(); }catch(e){}
   // 分享連結進站:完整重現分享者當下的所有設定(股票、日期、資金、加碼、比較股)
   let fromShare = false;
   try{
@@ -621,6 +618,7 @@ function updateDcaHint(){
     if(qs && /^\d{4,6}[A-Z]?$/i.test(qs.trim())){
       $('stockId').value = qs.trim().toUpperCase();
       fromShare = true; window.FROM_SHARE = true;
+      try{ localStorage.setItem('mode', 'one'); }catch(e){}
       const dt = v => v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v.replaceAll('-', '/') : null;
       const num = v => (v != null && v !== '' && isFinite(Number(v)) && Number(v) >= 0) ? Number(v) : null;
       if(dt(q.get('b'))) $('buyDate').value = dt(q.get('b'));
@@ -651,7 +649,8 @@ function updateDcaHint(){
   renderTopic();        // 話題雷達(新聞熱度):背景載入
   renderComeback();     // 🔔 回訪變化摘要:你上次查的股票,現在怎麼了——回訪者的第一眼
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
-  setTimeout(() => { try{ run(true); }catch(e){} }, fromShare ? 400 : 1200);
+  // 找熱門股模式不自動示範回測(省一輪載入,雷達先出來);點任一檔雷達股才跑
+  if(fromShare || (localStorage.getItem('mode') || 'hot') !== 'hot') setTimeout(() => { try{ run(true); }catch(e){} }, fromShare ? 400 : 1200);
 })();
 
 // 金額欄位即時加上千分位
@@ -1808,6 +1807,35 @@ function render(stockId, name, data, r, mas, taiex, cmp){
 }
 
 function quickRun(v){ $('stockId').value = v; run(); }
+
+// 🧭 模式:hot=找熱門股 / one=看一檔怎麼進出 / long=存股回測——決定區塊順序、要不要自動示範、深度回測要不要展開
+function applyModeOrder(){
+  const mode = localStorage.getItem('mode') || 'hot';
+  document.querySelectorAll('.modeBtn').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  const wb = $('watchBoard'), cont = wb.parentNode;
+  const formCard = $('stockId').closest('.card');
+  const results = $('results');
+  if(mode === 'hot'){
+    cont.insertBefore($('topicCard'), wb);
+    cont.insertBefore($('radarCard'), wb);
+    cont.insertBefore(formCard, wb);
+    if(results) cont.insertBefore(results, wb);
+  }else{
+    cont.insertBefore(formCard, wb);
+    if(results) cont.insertBefore(results, wb);
+    cont.insertBefore($('topicCard'), wb);
+    cont.insertBefore($('radarCard'), wb);
+  }
+  const cb = $('comebackCard'); if(cb){ const hdr = cont.querySelector('header'); cont.insertBefore(cb, hdr ? hdr.nextElementSibling : cont.firstElementChild); }   // 回訪摘要永遠在最上面(標題之下)
+  const dw = $('deepWrap'); if(dw) dw.open = (mode === 'long');
+}
+function setMode(m){
+  try{ localStorage.setItem('mode', m); }catch(e){}
+  applyModeOrder();
+  track('mode', {m});
+  if(m === 'hot'){ const t = $('topicCard').style.display !== 'none' ? $('topicCard') : $('radarCard'); if(t) t.scrollIntoView({behavior: 'smooth', block: 'start'}); }
+  else { const el = $('stockId'); el.scrollIntoView({behavior: 'smooth', block: 'center'}); setTimeout(() => el.focus(), 400); if(m === 'long'){ const dw = $('deepWrap'); if(dw) dw.open = true; } }
+}
 
 // 🎯 捲動校正:按分析後,雷達/觀察站/AI 卡在背景陸續長出來,會把頁面往下推、讓視窗偏離結果區
 // 解法:捲動後 3.5 秒內每次有新內容完成就重新對準;使用者一動手(滾輪/觸控)立刻放手
@@ -3901,6 +3929,7 @@ async function run(auto){
         if(deep.length){
           const d = document.createElement('details');
           d.id = 'deepWrap';
+          if((localStorage.getItem('mode') || 'hot') === 'long') d.open = true;
           d.style.cssText = 'margin-bottom:20px;';
           const sm = document.createElement('summary');
           sm.style.cssText = 'cursor:pointer; padding:14px 18px; background:var(--card); border:1px solid var(--border); border-radius:12px; font-weight:700; color:var(--accent); font-size:1rem;';
