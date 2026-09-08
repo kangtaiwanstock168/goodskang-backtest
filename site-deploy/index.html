@@ -328,7 +328,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-E|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-H|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -350,7 +350,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-E';
+const APP_VER = 'v20260909-H';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1990,8 +1990,8 @@ async function runDiag(){
     }catch(e){ posRow = ''; }
     // ── 出場:防守不看成本(市場不在意你買多少),但「調節/減碼」本質是損益問題——沒獲利就沒有調節這回事 ──
     const pl = cost > 0 ? (pNow - cost) / cost * 100 : null;
-    let hi120 = 0, hi40 = 0;
-    for(let j = Math.max(0, n2 - 120); j < n2; j++) hi120 = Math.max(hi120, h2[j]);
+    let hi120 = 0, hi40 = 0, hiC120 = 0, hiC120d = '';
+    for(let j = Math.max(0, n2 - 120); j < n2; j++){ hi120 = Math.max(hi120, h2[j]); if(c2[j] > hiC120){ hiC120 = c2[j]; hiC120d = bars[j].date; } }
     for(let j = Math.max(0, n2 - 40); j < n2; j++) hi40 = Math.max(hi40, h2[j]);
     const m20now = ma20a[n2 - 1] || 0, dMa = m20now > 0 ? (pNow - m20now) / m20now * 100 : 0;
     const lastB = bars[n2 - 1];
@@ -2048,17 +2048,54 @@ async function runDiag(){
           {k: 'stop', icon: '📉', nm: `跌破防守 ${fmt(pNow * (1 - ds))} 出場`, s: score(stopOut), trig: trigRate(stopTrig)}
         ];
         if(kC > 0) rules.splice(2, 0, {k: 'cost', icon: '💰', nm: kC > 1 ? `漲回成本 ${fmt(cost)} 出場` : `跌回成本 ${fmt(cost)} 出場`, s: score(costExit), trig: trigRate(costTrig)});
-        // 上次跌破防守線之後的表現:在相似日窗口裡,第一次收盤跌破 ds 之後 20 天的平均與「假跌破」比例
-        let breakStat = null;
-        { const arr = []; let fake = 0;
-          for(const x2 of used){ const e = c2[x2.i]; for(let j = x2.i + 1; j <= x2.i + 20; j++){ if(c2[j] < e * (1 - ds)){ const k2 = Math.min(n2 - 1, j + 10); arr.push(c2[k2] / c2[j] - 1); if(c2[k2] > e) fake++; break; } } }
-          if(arr.length >= 5) breakStat = {n: arr.length, after20: arr.reduce((a2, b2) => a2 + b2, 0) / arr.length * 100, fake: fake / arr.length * 100}; }
+        // 價位線的行為統計(通用):20 天內碰到這條線的機率(全部/上次那段)、碰到之後 10 天平均、反彈回線上的比例(假跌破)
+        // 價位線行為統計(通用,含方向):dir='down'=收盤跌到線下;'up'=收盤漲到線上。
+        // 回傳:20 天內碰到機率(全部/上次那段)、碰到後 10 天平均、反彈回線另一側的比例、反彈平均要等幾天
+        const lineStat = (lvl, dir) => {
+          const arr = []; let back = 0, hit = 0, lastHit = 0, lastN = 0, backDays = 0;
+          const lastSegId = used.length ? used[used.length - 1].seg : -1;
+          for(const x2 of used){ const e = c2[x2.i]; let t = false;
+            for(let j = x2.i + 1; j <= x2.i + 20; j++){
+              const touched = dir === 'down' ? c2[j] < e * lvl : c2[j] >= e * lvl;
+              if(touched){ t = true; const k2 = Math.min(n2 - 1, j + 10); arr.push(c2[k2] / c2[j] - 1);
+                // 反彈:跌破後回到線上(或漲回後又掉回線下)——記第一次發生在第幾天
+                for(let m3 = j + 1; m3 <= k2; m3++){ const backNow = dir === 'down' ? c2[m3] > e * lvl : c2[m3] < e * lvl; if(backNow){ back++; backDays += (m3 - j); break; } }
+                break; } }
+            if(t) hit++; if(x2.seg === lastSegId){ lastN++; if(t) lastHit++; } }
+          return {prob: used.length ? hit / used.length * 100 : 0, probLast: lastN ? lastHit / lastN * 100 : 0, n: arr.length, after: arr.length ? arr.reduce((a2, b2) => a2 + b2, 0) / arr.length * 100 : null, back: arr.length ? back / arr.length * 100 : null, backDays: back ? backDays / back : null};
+        };
+        const breakStat = lineStat(1 - ds, 'down');
+        const costStat = kC > 0 ? lineStat(kC, kC < 1 ? 'down' : 'up') : null;
+        // 🔁 出場再接沙盤:在某條線收盤跌破時出場(以那天收盤成交),之後 40 天——再跌多深(接回價)、有沒有漲回出場價(一去不復返?)、
+        // 以及「出場後跌 x% 接回」對比「一路抱著」到底多賺還是少賺;x 掃 3/5/8/10%,接不到就等收盤站回線上再追回(付出追高代價)
+        const exitPlan = lvl => {
+          const ev = [];
+          for(const x2 of used){ const e = c2[x2.i];
+            for(let j = x2.i + 1; j <= x2.i + 20; j++){ if(c2[j] < e * lvl){ ev.push({e, j, ex: c2[j], line: e * lvl}); break; } } }
+          if(ev.length < 5) return null;
+          const W = 40;
+          const depths = [], recDays = []; let rec = 0, reachStop = 0;
+          const edge = {}; for(const X of [3, 5, 8, 10]) edge[X] = [];
+          for(const v of ev){ const end = Math.min(n2 - 1, v.j + W); let mn = Infinity, r = null;
+            for(let m3 = v.j + 1; m3 <= end; m3++){ mn = Math.min(mn, l2[m3]); if(r == null && c2[m3] >= v.line){ r = m3 - v.j; } }
+            depths.push(mn / v.ex - 1); if(r != null){ rec++; recDays.push(r); }
+            if(mn <= v.e * (1 - ds)) reachStop++;
+            const holdEnd = c2[end] / v.ex - 1;   // 從出場價起算,一路抱著到期末
+            for(const X of [3, 5, 8, 10]){ let eq = (1 - fee), pos = false, entry = 0;
+              for(let m3 = v.j + 1; m3 <= end; m3++){ if(!pos){ if(c2[m3] <= v.ex * (1 - X / 100) || c2[m3] > v.line){ entry = c2[m3]; pos = true; } } }
+              if(pos) eq *= c2[end] / entry * (1 - fee); edge[X].push((eq - 1) - holdEnd); } }
+          const med = a3 => { const s3 = [...a3].sort((x3, y3) => x3 - y3); return s3.length ? s3[Math.floor(s3.length / 2)] : null; };
+          let bestX = 3, bestE = -Infinity; for(const X of [3, 5, 8, 10]){ const m4 = edge[X].reduce((a2, b2) => a2 + b2, 0) / edge[X].length * 100; if(m4 > bestE){ bestE = m4; bestX = X; } }
+          return {n: ev.length, depthMed: med(depths) * 100, depth25: (() => { const s3 = [...depths].sort((x3, y3) => x3 - y3); return s3[Math.floor(s3.length * 0.25)] * 100; })(), recover: rec / ev.length * 100, recDays: med(recDays), reachStop: reachStop / ev.length * 100, bestX, bestEdge: bestE};
+        };
+        const planCost = (kC > 0 && kC < 1) ? exitPlan(kC) : null;
+        const planStop = exitPlan(1 - ds);
         // 最近一段實況
         let lastSeg = null;
         { const segMap = {}; for(const x2 of used){ const sgm = segMap[x2.seg] = segMap[x2.seg] || {from: bars[x2.i].date, r: [], dd: []}; sgm.to = bars[x2.i].date; sgm.r.push(hold(x2.i, c2[x2.i])); let m3 = 0; for(let j = x2.i + 1; j <= x2.i + 20; j++) m3 = Math.min(m3, l2[j] / c2[x2.i] - 1); sgm.dd.push(m3); }
           const arr9 = Object.values(segMap); const lg = arr9[arr9.length - 1]; if(lg) lastSeg = {from: lg.from, to: lg.to, n: lg.r.length, r: lg.r.reduce((a2, b2) => a2 + b2, 0) / lg.r.length * 100, dd: Math.min(...lg.dd) * 100}; }
         const holdS = rules[0].s;
-        sb = {rules, ds, breakStat, lastSeg, segs: holdS.segR + holdS.segE, holdS};
+        sb = {rules, ds, breakStat, costStat, planCost, planStop, lastSeg, segs: holdS.segR + holdS.segE, holdS};
         stopTxt2 = `跌破波段防守 <b>${fmt(pNow * (1 - ds))}</b> 就走${dsRaw < ds - 0.001 ? `(結構防守 ${fmt(stopS)} 比這檔平常回檔還緊,只適合當沖)` : ''}`;
       }
     }
@@ -2075,32 +2112,57 @@ async function runDiag(){
       const mod = (blackBig ? ';<b class="down">今日高檔爆量收黑=出貨警訊,先減 1/3</b>' : '') + (d.nh40 ? ';今日帶量創新高,不急著減' : '');
       exitRow = `<b>獲利 +${pl.toFixed(0)}%</b>——鎖利價跟漲、部分停利價分批,兩條線就夠${mod}`;
     }
-    // 🎯 結論:上次在這裡 → 四條規則(上次/三年/最差) → 部分停利價 → 防守/鎖利價(依成本誠實命名)
+    // 🎯 結論:上次在這裡 → 四條做法(續抱/減半=結果;回成本/跌破防守=出場價、鎖定損益、碰到機率、碰到之後)→ 部分停利兩段
     let tpRow = '';
     if(sb){
       const sg5 = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
       const cl = v => v == null ? '' : (v >= 0 ? 'up' : 'down');
       const ls = sb.lastSeg;
-      const tp1Pct = Math.max(mfe25, 2), tp1 = pNow * (1 + tp1Pct / 100);            // 第一段:至少 +2%,否則微利先出沒意義
-      const tp2 = Math.min(hi120, pNow * (1 + Math.max(mfe50, tp1Pct + 2) / 100));   // 第二段:一半案例到得了,前高封頂
-      const trimPrice = tp2;
-      const stopPx = pNow * (1 - sb.ds);
-      const lockAt = cost > 0 ? cost / (1 - sb.ds) : 0;   // 現價要漲到這裡,移動線才會高過成本、變成真正的鎖利線
-      // 對你成本:20 天後的總損益=(現價/成本)×(1+做法報酬)−1——減半就是一半落袋、一半照上次那段走,自然算進去
       const toC = v => (cost > 0 && v != null) ? ((pNow / cost) * (1 + v / 100) - 1) * 100 : v;
       const frame = cost > 0 ? '對你成本' : '從現價';
-      const trigNote = r5 => !r5.trig ? '' : (r5.trig.last < 1 ? `<span style="opacity:.75;">(上次那段沒跌到這條線,等於續抱)</span>` : `<span style="opacity:.75;">(上次那段 ${r5.trig.last.toFixed(0)}% 的日子觸發出場)</span>`);
-      const ruleLine = r5 => `<div style="margin-top:3px;">${r5.icon} <b>${r5.nm}</b>:上次那段 → ${frame} <b class="${cl(toC(r5.s.last))}">${sg5(toC(r5.s.last))}</b> ${trigNote(r5)}|最差情況 → <b class="${cl(toC(r5.s.worst))}">${sg5(toC(r5.s.worst))}</b>${r5.trig ? `<span style="opacity:.75;">(這條線守住了)</span>` : ''}</div>`;
-      const bestRule = [...sb.rules].sort((a2, b2) => (b2.s.last ?? -99) - (a2.s.last ?? -99))[0];
+      const lockPct = px => cost > 0 ? ((px * (1 - 0.00585)) / cost - 1) * 100 : (px * (1 - 0.00585) / pNow - 1) * 100;
+      const stopPx0 = pNow * (1 - sb.ds);
+      const lab = cost > 0 ? '' : '從現價 ';
+      const R = Object.fromEntries(sb.rules.map(r5 => [r5.k, r5]));
+      const rangeLine = r5 => `<div style="margin-top:4px;">${r5.icon} <b>${r5.nm}</b>:上次那段 ${lab}<b class="${cl(toC(r5.s.last))}">${sg5(toC(r5.s.last))}</b>|最差情況 <b class="${cl(toC(r5.s.worst))}">${sg5(toC(r5.s.worst))}</b></div>`;
+      // 數據偏向:上次那段與最差情況的中點(=上下限各半機率的期望)高者勝;差距 <1 個百分點視為接近
+      let recLine = '';
+      if(R.hold && R.half){
+        const midH = (toC(R.hold.s.last) + toC(R.hold.s.worst)) / 2, midF = (toC(R.half.s.last) + toC(R.half.s.worst)) / 2;
+        const upD = toC(R.hold.s.last) - toC(R.half.s.last), dnD = toC(R.half.s.worst) - toC(R.hold.s.worst);
+        recLine = Math.abs(midH - midF) < 1
+          ? `<div style="margin-top:4px;">👉 兩者接近——看你能承受的下限:續抱最差 ${sg5(toC(R.hold.s.worst))},減半最差 ${sg5(toC(R.half.s.worst))}</div>`
+          : midF > midH
+            ? `<div style="margin-top:4px;">👉 <b>數據偏向:🥚 立即減半保留</b>——上限只少 ${upD.toFixed(1)} 個百分點,下限卻好 ${dnD.toFixed(1)} 個百分點(把最慘從 ${sg5(toC(R.hold.s.worst))} 壓到 ${sg5(toC(R.half.s.worst))})</div>`
+            : `<div style="margin-top:4px;">👉 <b>數據偏向:⚡ 續抱不動</b>——上限多 ${upD.toFixed(1)} 個百分點,下限只差 ${dnD.toFixed(1)}</div>`;
+      }
+      const backTxt = stt => stt.back != null ? `、${stt.back.toFixed(0)}% 會反彈回線上${stt.backDays ? `(平均等 ${stt.backDays.toFixed(1)} 天)` : ''}` : '';
+      const condDown = (icon, nm, px, stt, extra) => `<div style="margin-top:3px;">${icon} <b>${nm}</b>:出場鎖定 <b class="${cl(lockPct(px))}">${sg5(lockPct(px))}</b>|20 天內跌到的機率 <b>${stt.prob.toFixed(0)}%</b>(上次那段 ${stt.probLast.toFixed(0)}%)${stt.after != null ? `|跌到後 10 天平均 <b class="${cl(stt.after)}">${sg5(stt.after)}</b>${backTxt(stt)}` : ''}${extra || ''}</div>`;
+      const condUp = (icon, nm, px, stt) => `<div style="margin-top:3px;">${icon} <b>${nm}</b>:解套鎖定 <b class="${cl(lockPct(px))}">${sg5(lockPct(px))}</b>|20 天內漲回的機率 <b>${stt.prob.toFixed(0)}%</b>(上次那段 ${stt.probLast.toFixed(0)}%)${stt.after != null ? `|漲回後 10 天平均 <b class="${cl(stt.after)}">${sg5(stt.after)}</b>、${(100 - stt.back).toFixed(0)}% 站穩成本之上——${(100 - stt.back) >= 60 ? '解套後多半續漲,漲回成本別急著全出' : '解套後常又掉回去,漲回成本先減一半是合理的'}` : ''}</div>`;
+      const stopExtra = (cost > 0 && stopPx0 < cost) ? `<br><span style="opacity:.8;">　　這條線在成本之下=停損;股價漲過 ${fmt(cost / (1 - sb.ds))} 後它才會高過成本、變成鎖利線(價漲跟著抬)</span>` : (cost > 0 ? `<br><span style="opacity:.8;">　　這條線已在成本之上=鎖利線,價漲跟著抬</span>` : '');
+      const otherLines = (R.cost ? (sb.costStat ? (cost < pNow ? condDown(R.cost.icon, R.cost.nm, cost, sb.costStat) : condUp(R.cost.icon, R.cost.nm, cost, sb.costStat)) : '') : '')
+        + condDown(R.stop.icon, R.stop.nm, stopPx0, sb.breakStat, stopExtra);
+      // 🔁 出場再接:金額照計算器的張數(沒設就以 1 張計)
+      let shares0 = 1000; try{ const md = localStorage.getItem('posMode') || 'A'; if(md === 'B'){ const s9 = Math.max(0, Math.floor(numIn($('posLots').value))) * 1000 + Math.max(0, Math.floor(numIn($('posOdd').value))); if(s9 > 0) shares0 = s9; } }catch(e){}
+      const $n2 = v => Math.round(v).toLocaleString('zh-TW');
+      const planLine = (nm, linePx, P) => {
+        if(!P) return '';
+        const exitPx = linePx;                                       // 以線價估算(實際是跌破那天的收盤,通常再低一點)
+        const exitPnl = cost > 0 ? (exitPx * (1 - 0.00585) - cost) * shares0 : null;
+        const rebuy = exitPx * (1 + P.depthMed / 100);                // 接回參考價=出場後再跌的中位深度
+        const breakEven = cost > 0 ? (rebuy + Math.max(0, -exitPnl) / shares0) / (1 - 0.00585) : null;   // 接回後漲到這裡,補回出場虧損
+        return `<div style="margin-top:4px;">🔁 <b>在 ${fmt(exitPx)} 出場再接</b>${exitPnl != null ? `(帳面 <b class="${exitPnl >= 0 ? 'up' : 'down'}">${exitPnl >= 0 ? '+' : ''}${$n2(exitPnl)} 元</b>,${shares0 / 1000 >= 1 ? (shares0 / 1000).toFixed(shares0 % 1000 ? 1 : 0) + ' 張' : shares0 + ' 股'}含費)` : ''}:出場後 40 天再跌深度中位 <b>${P.depthMed.toFixed(1)}%</b>(較深時 ${P.depth25.toFixed(1)}%)→ <b>接回參考價 ${fmt(rebuy)}</b>${nm === 'cost' ? `|從這裡再跌到防守線的機會 <b>${P.reachStop.toFixed(0)}%</b>` : ''}|40 天內漲回出場價的機會 <b>${P.recover.toFixed(0)}%</b>${P.recDays ? `(中位 ${P.recDays} 天)` : ''}、<b class="down">${(100 - P.recover).toFixed(0)}% 沒回來</b>|歷史上「出場後跌 ${P.bestX}% 接回」比一路抱著 <b class="${P.bestEdge >= 0 ? 'up' : 'down'}">${P.bestEdge >= 0 ? '多賺' : '少賺'} ${Math.abs(P.bestEdge).toFixed(1)}%</b>${breakEven ? `|接回 ${fmt(rebuy)} 後漲到 <b>${fmt(breakEven)}</b> 就補回出場虧損` : ''}</div>`;
+      };
+      const planLines = (sb.planCost && cost > 0 && cost < pNow ? planLine('cost', cost, sb.planCost) : '') + planLine('stop', stopPx0, sb.planStop);
+      const tp1Pct = Math.max(mfe25, 2), tp1 = pNow * (1 + tp1Pct / 100);
+      const tp2 = Math.min(hiC120, pNow * (1 + Math.max(mfe50, tp1Pct + 2) / 100));   // 第二段:一半案例到得了,近半年「收盤」高點封頂(盤中尖刺不算)
       tpRow = (ls ? `<div>🕰 <b>上次在這個位置</b>(${ls.from.slice(5).replace('-', '/')}~${ls.to.slice(5).replace('-', '/')},${ls.n} 個交易日${ls.n < 5 ? ',樣本很短、參考就好' : ''}):抱 20 天 <b class="${cl(ls.r)}">${sg5(ls.r)}</b>,中間最深 <b class="down">${ls.dd.toFixed(0)}%</b>${cost > 0 ? `——換成你的成本 ${fmt(cost)}:抱 20 天後 <b class="${cl(toC(ls.r))}">${sg5(toC(ls.r))}</b>、中間最深時 <b class="${cl(toC(ls.dd))}">${sg5(toC(ls.dd))}</b>` : ''}</div>` : '')
-        + `<div style="margin-top:6px; font-weight:700;">四種做法(接下來 20 個交易日):</div>`
-        + sb.rules.map(ruleLine).join('')
-        + (sb.breakStat ? `<div style="margin-top:3px; font-size:.92em; opacity:.9;">　↳ 跌破防守後 10 天平均 <b class="${cl(sb.breakStat.after20)}">${sg5(sb.breakStat.after20)}</b>,其中 <b>${sb.breakStat.fake.toFixed(0)}%</b> 是假跌破(10 天內漲回進場價)——假跌破多就別急著追殺出場價,等收盤確認</div>` : '')
-        + (() => { const top = sb.rules.filter(r5 => Math.abs((r5.s.last ?? -99) - (bestRule.s.last ?? -99)) < 0.05); return `<div style="margin-top:6px;">上次那段最好的做法:<b>${top.map(r5 => r5.icon + ' ' + r5.nm).join('、')}</b>(${frame} ${sg5(toC(bestRule.s.last))}${top.length > 1 ? ';平手是因為那段沒跌到出場線,這幾種做法結果相同' : ''})</div>`; })()
-        + `<div style="margin-top:8px;">🎯 <b>部分停利</b>:第一段 <b><span style="font-size:1.15em; color:var(--accent);">${fmt(tp1)}</span></b>(現價 ${sg5((tp1 / pNow - 1) * 100)}${cost > 0 ? `、對成本 ${sg5((tp1 / cost - 1) * 100)}` : ''};歷史上四分之三的案例 20 天內到得了)先出 1/3|第二段 <b><span style="font-size:1.15em; color:var(--accent);">${fmt(tp2)}</span></b>(${sg5((tp2 / pNow - 1) * 100)}${cost > 0 ? `、對成本 ${sg5((tp2 / cost - 1) * 100)}` : ''};一半案例到得了${tp2 >= hi120 - 0.001 ? ',已是區間高點=天花板' : ''})再出 1/3|剩下跟鎖利價走</div>`
-        + (cost > 0 && stopPx < cost
-          ? `<div style="margin-top:4px;">🛡 <b>停損價 <span style="font-size:1.15em; color:var(--accent);">${fmt(stopPx)}</span></b>(現價回檔 ${(sb.ds * 100).toFixed(0)}%;對成本 ${sg5((stopPx / cost - 1) * 100)})——它在你的成本之下,現階段是停損不是鎖利;股價漲過 <b>${fmt(lockAt)}</b> 後這條線才會高過成本、變成鎖利線(價漲它跟著抬)</div>`
-          : `<div style="margin-top:4px;">🛡 <b>鎖利價 <span style="font-size:1.15em; color:var(--accent);">${fmt(stopPx)}</span></b>(現價回檔 ${(sb.ds * 100).toFixed(0)}%${cost > 0 ? `;已在成本之上,對成本 ${sg5((stopPx / cost - 1) * 100)}` : ''};價漲跟著抬)——收盤跌破就出,不猜底</div>`);
+        + `<div style="margin-top:6px; font-weight:700;">接下來 20 個交易日,先決定要不要減碼:</div>`
+        + rangeLine(R.hold) + rangeLine(R.half) + recLine
+        + `<div style="margin-top:8px; font-weight:700;">兩條出場線:</div>`
+        + otherLines
+        + planLines
+        + `<div style="margin-top:8px;">🎯 <b>${cost > 0 && tp1 < cost ? '反彈減碼(仍低於成本,不是停利)' : '部分停利'}</b>:第一段 <b><span style="font-size:1.15em; color:var(--accent);">${fmt(tp1)}</span></b>(現價 ${sg5((tp1 / pNow - 1) * 100)}${cost > 0 ? `、對成本 ${sg5((tp1 / cost - 1) * 100)}` : ''};歷史同狀態的 20 天最大漲幅,四分之三超過這裡)先出 1/3|第二段 <b><span style="font-size:1.15em; color:var(--accent);">${fmt(tp2)}</span></b>(${sg5((tp2 / pNow - 1) * 100)}${cost > 0 ? `、對成本 ${sg5((tp2 / cost - 1) * 100)}` : ''};一半超過這裡${tp2 >= hiC120 - 0.001 ? `,已封頂在 ${hiC120d.slice(5).replace('-', '/')} 的收盤高點` : ''})再出 1/3|剩下跟防守線走</div>`;
     }
     let html = `<div style="margin-top:4px;">`
       + row('📍 位階', `${posTxt}、月線之${aboveNow ? '上' : '下'}、距一年高點 ${(ddNow * 100).toFixed(1)}%`)
