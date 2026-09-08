@@ -361,7 +361,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-O|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-P|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -383,7 +383,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-O';
+const APP_VER = 'v20260909-P';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2377,7 +2377,11 @@ async function runDiag(o){
     // ── 狀態 ──
     // ── 技術上的好操作:一句主句 + 警示各自一行,做成醒目框 ──
     const guard = stopOk ? `最終防守 <b class="dxBig">${fmt(stopUse)}</b>` : '<b class="down">目前無防守,依紀律不進場</b>';
-    const warnTop = atTop ? `<br>⚠ 貼近區間高${hi120 > 0 ? ' ' + fmt(hi120) : ''},若要進場最好分批不梭哈` : '';
+    // 追高警示要講對原因:貼近半年高、或半年區間高檔、或乖離月線太大——三件事分開講,不能 136 塊寫「貼近區間高 182」
+    const topWhy = [];
+    if(nearHi <= 3) topWhy.push(`貼近半年高 ${fmt(hi120)}`); else if(posNow >= 0.8) topWhy.push(`半年區間高檔(${(posNow * 100).toFixed(0)}%)`);
+    if(dMa >= 8) topWhy.push(`乖離月線 ${sg(dMa)}`);
+    const warnTop = topWhy.length ? `<br>⚠ ${topWhy.join('、')},若要進場最好分批不梭哈` : '';
     const warnBlk = blackBig ? '<br>⚠ 今日高檔爆量收黑,先減一部分' : '';
     let st9;
     if(o.buyNow) st9 = `🛒 現價進場:${guard},停利到了分批減${warnTop}${warnBlk}`;
