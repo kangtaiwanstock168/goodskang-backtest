@@ -365,7 +365,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-T|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-U|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -387,7 +387,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-T';
+const APP_VER = 'v20260909-U';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2403,13 +2403,23 @@ async function runDiag(o){
         + `</table>`;
       if(cost > 0 && !o.buyNow && LR) con += `<div style="font-size:.88em; opacity:.85;">↳ 對成本 ${fmt(cost)}:上次那段 20 日 ${B(toC(LR.r20))}・最高時 ${B(toC(LR.up))}・最深時 ${B(toC(LR.dd))}</div>`;
       // ② 減碼(持倉才有)
+      // ⚖️ 減不減碼:兩個門檻——①損益還在雜訊區(來回手續費 0.6%+日振幅)就不談減碼,+2% 減半是把錢送給券商;
+      // ②統計樣本是同劇本才拿「上次那段」當主角;退回廣樣本時,上次那段可能是另一齣戲(聯電 6 月崩盤段),改用「各段平均」+「最差段」判,上次那段只列參考
       let cutTxt = '';
-      if(!o.buyNow && R.hold && R.half){
-        const hL = toC(R.hold.s.last), hW = toC(R.hold.s.worst), fL = toC(R.half.s.last), fW = toC(R.half.s.worst);
-        const midH = (hL + hW) / 2, midF = (fL + fW) / 2;
-        cutTxt = Math.abs(midH - midF) < 1 ? '續抱與減半接近,看你扛得住哪個下限' : midF > midH ? `減半——最慘從 ${sg(hW)} 壓到 ${sg(fW)}` : `續抱——上限多 ${(hL - fL).toFixed(1)} 點,下限只差 ${(fW - hW).toFixed(1)} 點`;
-        con += `<div class="dxSub">⚖️ 減不減碼(上次那段 / 最差段)</div><table class="dxT">${th('做法', '上次那段', '最差段')}${tr('⚡ 續抱不動', B(hL), B(hW))}${tr('🥚 立即減半', B(fL), B(fW))}</table><div>👉 數據偏向:<b>${cutTxt}</b></div>`;
-        advice.cut = cutTxt;
+      const noise = Math.max(3, ampP);   // 雜訊區:至少 3%,或這檔一天的振幅
+      if(!o.buyNow && R.hold && R.half && pl != null){
+        if(Math.abs(pl) < noise && !legacy){
+          con += `<div class="dxSub">⚖️ 減不減碼</div><div>損益 ${sg(pl)} 還在雜訊區(來回費用 0.6%、日振幅 ${ampP.toFixed(1)}%,門檻 ±${noise.toFixed(1)}%)——<b>不談減碼</b>,照防守與停利走</div>`;
+          advice.cut = '';
+        }else{
+          const mainKey = sameReg ? 'last' : 'rob', mainLb = sameReg ? '上次那段' : '各段平均';
+          const hL = toC(R.hold.s[mainKey]), hW = toC(R.hold.s.worst), fL = toC(R.half.s[mainKey]), fW = toC(R.half.s.worst);
+          const midH = (hL + hW) / 2, midF = (fL + fW) / 2;
+          cutTxt = Math.abs(midH - midF) < 1 ? '續抱與減半接近,看你扛得住哪個下限' : midF > midH ? `減半——最慘從 ${sg(hW)} 壓到 ${sg(fW)}` : `續抱——上限多 ${(hL - fL).toFixed(1)} 點,下限只差 ${(fW - hW).toFixed(1)} 點`;
+          const refCol = sameReg ? '' : `(上次那段參考:續抱 ${sg(toC(R.hold.s.last))}、減半 ${sg(toC(R.half.s.last))},那是另一齣戲)`;
+          con += `<div class="dxSub">⚖️ 減不減碼(${mainLb} / 最差段)</div><table class="dxT">${th('做法', mainLb, '最差段')}${tr('⚡ 續抱不動', B(hL), B(hW))}${tr('🥚 立即減半', B(fL), B(fW))}</table><div>👉 數據偏向:<b>${cutTxt}</b> <span style="font-size:.85em; opacity:.75;">${refCol}</span></div>`;
+          advice.cut = cutTxt;
+        }
       }
       // ③ 出場線表
       const rows = [];
@@ -2457,7 +2467,7 @@ async function runDiag(o){
       let st;
       if(legacy) st = `解套中長線單(曾跌到 ${fmt(lo120)}):「跌破就走」不適用,${advice.cut ? '數據偏向' + advice.cut.split('——')[0] : '照出場線走'}`;
       else if(pl < 0) st = `浮虧 ${pl.toFixed(1)}%:不攤平,${guardPx ? '守 ' + guardPx + ',不破就抱' : '無防守,反彈到月線減碼'}`;
-      else if(pl < 10) st = `小賺 ${sg(pl)}:${advice.cut ? '數據偏向' + advice.cut.split('——')[0] + ';' : ''}停利到了再減`;
+      else if(pl < 10) st = `小賺 ${sg(pl)}:${advice.cut ? '數據偏向' + advice.cut.split('——')[0] + ';' : '還在雜訊區不動;'}停利到了再減`;
       else st = `獲利 ${sg(pl)}:鎖利線跟漲抬,${advice.cut ? '數據偏向' + advice.cut.split('——')[0] + ';' : ''}停利分批`;
       L.push(`💼 <b>持倉</b>:${st}${blackBig ? ';⚠ 今日爆量收黑先減一部分' : ''}${d.nh40 ? ';🚀 帶量創高不急減' : ''}`);
     }
