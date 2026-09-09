@@ -159,6 +159,10 @@
   .dxTag{display:inline-block; padding:0 7px; border-radius:999px; font-size:.78rem; font-weight:700; border:1px solid var(--border); margin-left:4px;}
   .dxDo{margin-top:10px; padding:12px 14px; border:1px solid var(--accent); background:rgba(88,166,255,.10); border-radius:12px; font-size:1.02rem; font-weight:600; line-height:1.9;}
   .dxDo .h{color:var(--accent); font-weight:800; margin-bottom:4px;}
+  .dxSub{font-weight:700; margin:8px 0 2px;}
+  .dxT{border-collapse:collapse; width:100%; margin:2px 0 4px; font-size:.9rem;}
+  .dxT th,.dxT td{padding:3px 8px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;}
+  .dxT th{color:var(--muted); font-weight:600; font-size:.78rem;} .dxT td.lb,.dxT th:first-child{text-align:left;}
   .dxDisc{margin-top:10px; padding:8px 12px; border:1px dashed var(--gold); border-radius:8px; color:var(--gold); font-size:.85rem; line-height:1.6;}
 </style>
 </head>
@@ -361,7 +365,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-R|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-T|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -383,7 +387,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-R';
+const APP_VER = 'v20260909-T';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1924,6 +1928,7 @@ async function runHold(){
   const buyNow = cost > 0 && $('hCost').dataset.now === '1';   // 用「現價」帶入的=現在想買,不是持倉:沒有減半/回成本,改給買進後 5/10/20 日績效
   try{ localStorage.setItem('posMode', 'B'); localStorage.setItem('posLots', String(Math.floor(shares / 1000))); localStorage.setItem('posOdd', String(shares % 1000)); }catch(e){}
   track('hold_calc', {stock: id});
+  try{ $('stockId').value = `${id} ${(stockList || []).find(s2 => s2.id === id)?.name || ''}`.trim(); }catch(e){}   // 上下同步:上面算哪檔,下面就是哪檔
   out.style.display = 'block';
   out.innerHTML = '<p style="margin:4px 0; color:var(--muted);">⏳ 抓取近半年日K與即時價,算五燈與防守…</p>';
   if(btn) btn.disabled = true;
@@ -1951,6 +1956,8 @@ async function runHold(){
       + `<p style="margin:10px 0 0; font-size:.88rem;"><a href="javascript:void(0)" onclick="quickRun('${id} ${nm.replace(/[<>'"]/g, '')}')" style="color:var(--accent);">🔎 看這檔的完整五燈檢查表、標註 K 線與回測 →</a></p>`;
     calcPosRev({d, lots: Math.floor(shares / 1000), odd: shares % 1000, out: $('hPos')});
     await runDiag({d, cost, hold: holdAge, shares, out: $('hDx'), buyNow});
+    // 下方完整回測與 AI 卡也跟著換成這檔(背景跑、不捲動);同一檔就不重跑
+    try{ if(!(lastRunInfo && lastRunInfo.id === id)) run(true); }catch(e){}
   }catch(e){ out.innerHTML = '<span class="down">資料源忙線,稍後再試。</span>'; }
   finally{ if(btn) btn.disabled = false; }
 }
@@ -2336,10 +2343,18 @@ async function runDiag(o){
     const stopUse = sb ? pNow * (1 - sb.ds) : stopS;   // 實際採用的防守(結構線;太貼日振幅時退一層)
     const useP = stopOk ? (pNow - stopUse) / pNow * 100 : 0;
     const stopTag = !stopOk ? '<span class="down">破底中・無防守</span>' : (ampP > 0 && useP < ampP * 0.8) ? '<span class="down">⚠ 比日振幅還近,盤中易掃</span>' : useP > 12 ? '<span style="color:var(--gold);">偏寬,賠得多</span>' : '<span class="up">✓ 可執行</span>';
+    // 🔒 鎖利線:防守價位看市場(結構線),但「賺多少要鎖多少」看你的成本——獲利 ≥10% 至少保本(含費)、≥20% 鎖住一半利潤;取結構線與鎖利線較高者當最終防守
+    let lockPx = 0, lockWhy = '';
+    if(!o.buyNow && cost > 0 && pl != null && stopOk){
+      if(pl >= 20){ lockPx = cost * (1 + pl / 200); lockWhy = `獲利 ${sg(pl)},鎖住一半利潤`; }
+      else if(pl >= 10){ lockPx = cost * 1.012; lockWhy = `獲利 ${sg(pl)},至少保本(含費)`; }
+    }
+    const lockBinds = stopOk && lockPx > stopUse + 0.001;
+    const finalStop = stopOk ? Math.max(stopUse, lockPx) : 0, finalP = stopOk ? (pNow - finalStop) / pNow * 100 : 0;
     // ── 四格重點 ──
     let tiles = tile('🎬 劇本', REG[regNow], `乖離 ${sg(biasNow)}・距一年高 ${sg(ddNow * 100)}`, 'var(--accent)')
-      + tile('🛡 防守', stopOk ? fmt(stopUse) : '—', stopOk ? `${sg(-useP)} ${stopTag}${sb && stopUse < stopS - 0.001 ? `<br>結構線 ${fmt(stopS)}(${sg(-dsPct)})比日振幅 ${ampP.toFixed(1)}% 近,退一層` : ''}` : stopTag)
-      + tile('📦 部位', posSh >= 1 ? qtyTxt : '未設', posSh >= 1 ? `${$n(posSh * pNow)} 元${stopOk ? `・破守賠 <b class="down">${$n(posSh * (pNow - stopUse))}</b>` : ''}` : '上方填張數')
+      + tile('🛡 防守', stopOk ? fmt(finalStop) : '—', stopOk ? `${sg(-finalP)} ${lockBinds ? '<span class="up">🔒 鎖利線</span>' : stopTag}${lockBinds ? `<br>${lockWhy};結構線 ${fmt(stopUse)} 在它下面` : (sb && stopUse < stopS - 0.001 ? `<br>結構線 ${fmt(stopS)}(${sg(-dsPct)})比日振幅 ${ampP.toFixed(1)}% 近,退一層` : '')}` : stopTag)
+      + tile('📦 部位', posSh >= 1 ? qtyTxt : '未設', posSh >= 1 ? `${$n(posSh * pNow)} 元${stopOk ? `・破守賠 <b class="down">${$n(posSh * (pNow - finalStop))}</b>` : ''}` : '上方填張數')
       + (o.buyNow ? tile('💼 現價買入', fmt(pNow), '假設現在成交', 'var(--gold)')
         : cost > 0 ? tile('💼 持倉', sg(pl), `成本 ${fmt(cost)} → ${fmt(pNow)}${legacy ? '・解套單' : ''}`, pl >= 0 ? 'var(--red)' : 'var(--green)')
         : tile('💼 持倉', '未填成本', '只算防守與部位'));
@@ -2368,61 +2383,92 @@ async function runDiag(o){
     // ── 股性 ──
     body += sec('📊 股性', `${segN} 段・${sims.length} 日 ${relaxNote}<br>${K('平常回檔 ' + mae50.toFixed(1) + '%')}${K('較深 ' + mae25.toFixed(1) + '%')}${K('通常再漲 +' + mfe50.toFixed(1) + '%')}${K('強一點 +' + mfe75.toFixed(1) + '%')}`);
     // ── 結論 ──
+    // ═══ 結論:表格化——買進後績效表、出場線表、停利兩顆價位;文字只留標籤 ═══
+    let advice = {entry: '', guard: '', tp: '', pos: '', expect: '', cut: ''};
     if(sb){
-      const ls = sb.lastSeg;
       const toC = v => (cost > 0 && !o.buyNow && v != null) ? ((pNow / cost) * (1 + v / 100) - 1) * 100 : v;
       const lockPct = px => (cost > 0 ? (px * (1 - 0.00585)) / cost - 1 : px * (1 - 0.00585) / pNow - 1) * 100;
       const stopPx0 = pNow * (1 - sb.ds);
       const R = Object.fromEntries(sb.rules.map(r5 => [r5.k, r5]));
       const kC = R.cost ? cost / pNow : 0;
-      let con = '';
       const LR = lastR;
-      if(LR){
-        con += `🕰 <b>上次${LR.same ? '同劇本' : '同位階'}</b> ${md(LR.from)}~${md(LR.to)}(${LR.n} 日${LR.same ? '' : '・當時是' + LR.reg}${LR.n < 5 ? '・樣本短' : ''}):${K('5 日 ' + B(LR.r5))}${K('10 日 ' + B(LR.r10))}${K('20 日 ' + B(LR.r20))}${K('最高 +' + LR.up.toFixed(0) + '%')}${K('最深 ' + LR.dd.toFixed(0) + '%')}${LR.up >= 8 && LR.r20 < LR.up - 6 ? '<span class="dxTag" style="color:var(--gold);">先漲後回吐</span>' : ''}<span class="dxTag" style="opacity:.8;">一段行情,不是機率</span>`;
-        if(cost > 0 && !o.buyNow) con += `<br>　↳ 對成本 ${fmt(cost)}:${K('20 日 ' + B(toC(LR.r20)))}${K('最高時 ' + B(toC(LR.up)))}${K('最深時 ' + B(toC(LR.dd)))}`;
-      }
-      con += `<br>📅 <b>統計樣本 20 日</b>(${sameReg ? '同劇本' : '同位階・不分劇本'} ${segN} 段・${sims.length} 日):${K('勝率 ' + sb.hz[2].win.toFixed(0) + '%')}${K('中位 ' + B(sb.hz[2].med))}${K('最差段 ' + B(sb.hz[2].s.worst))}`;
-      if(o.buyNow){
-        con += `<br>🛒 <b>現價買進後</b>:` + sb.hz.map((z, zi) => `<br>　${z.H} 日 → 上次那段 ${B(LR ? [LR.r5, LR.r10, LR.r20][zi] : z.s.last)}・勝率 ${z.win.toFixed(0)}%・中位 ${B(z.med)}・最差段 ${B(z.s.worst)}`).join('');
-      }else if(R.hold && R.half){
+      const th = (...a) => `<tr>${a.map(x => `<th>${x}</th>`).join('')}</tr>`;
+      const tr = (...a) => `<tr>${a.map((x, k) => `<td${k === 0 ? ' class="lb"' : ''}>${x}</td>`).join('')}</tr>`;
+      let con = '';
+      // ① 買進後績效表
+      con += `<div class="dxSub">📅 ${o.buyNow ? '現價買進後' : '從現價起算'}(統計樣本:${sameReg ? '同劇本' : '同位階'} ${segN} 段・${sims.length} 日${LR ? `|上次${LR.same ? '同劇本' : '同位階'} ${md(LR.from)}~${md(LR.to)}` : ''})</div>`;
+      con += `<table class="dxT">${th('視角', '上次那段', '勝率', '中位', '最差段')}`
+        + sb.hz.map((z, zi) => tr(`${z.H} 日`, B(LR ? [LR.r5, LR.r10, LR.r20][zi] : z.s.last), z.win.toFixed(0) + '%', B(z.med), B(z.s.worst))).join('')
+        + (LR ? tr('中間最高/最深', `<b class="up">+${LR.up.toFixed(0)}%</b> / <b class="down">${LR.dd.toFixed(0)}%</b>`, '', `<b class="up">+${mfe50.toFixed(0)}%</b> / <b class="down">${mae50.toFixed(0)}%</b>`, '') : '')
+        + `</table>`;
+      if(cost > 0 && !o.buyNow && LR) con += `<div style="font-size:.88em; opacity:.85;">↳ 對成本 ${fmt(cost)}:上次那段 20 日 ${B(toC(LR.r20))}・最高時 ${B(toC(LR.up))}・最深時 ${B(toC(LR.dd))}</div>`;
+      // ② 減碼(持倉才有)
+      let cutTxt = '';
+      if(!o.buyNow && R.hold && R.half){
         const hL = toC(R.hold.s.last), hW = toC(R.hold.s.worst), fL = toC(R.half.s.last), fW = toC(R.half.s.worst);
         const midH = (hL + hW) / 2, midF = (fL + fW) / 2;
-        const verdict = Math.abs(midH - midF) < 1 ? `兩者接近——看你扛得住哪個下限` : midF > midH ? `<b>🥚 減半</b>——最慘從 ${sg(hW)} 壓到 ${sg(fW)},上限${hL - fL >= 0 ? '只少' : '反而多'} ${Math.abs(hL - fL).toFixed(1)} 點` : `<b>⚡ 續抱</b>——上限多 ${(hL - fL).toFixed(1)} 點,下限只差 ${(fW - hW).toFixed(1)} 點`;
-        con += `<br>⚖️ <b>減碼?</b> ⚡ 續抱 ${B(hL)}/最差 ${B(hW)}　🥚 減半 ${B(fL)}/最差 ${B(fW)}<br>　👉 數據偏向:${verdict}`;
+        cutTxt = Math.abs(midH - midF) < 1 ? '續抱與減半接近,看你扛得住哪個下限' : midF > midH ? `減半——最慘從 ${sg(hW)} 壓到 ${sg(fW)}` : `續抱——上限多 ${(hL - fL).toFixed(1)} 點,下限只差 ${(fW - hW).toFixed(1)} 點`;
+        con += `<div class="dxSub">⚖️ 減不減碼(上次那段 / 最差段)</div><table class="dxT">${th('做法', '上次那段', '最差段')}${tr('⚡ 續抱不動', B(hL), B(hW))}${tr('🥚 立即減半', B(fL), B(fW))}</table><div>👉 數據偏向:<b>${cutTxt}</b></div>`;
+        advice.cut = cutTxt;
       }
-      con += `<br>🚪 <b>出場線</b>`;
+      // ③ 出場線表
+      const rows = [];
       if(R.cost && sb.costStat){ const st = sb.costStat, up9 = kC > 1;
-        con += `<br>　💰 ${up9 ? '漲回' : '跌回'}成本 <b>${fmt(cost)}</b> → 鎖 ${B(lockPct(cost))}・20 日${up9 ? '漲回' : '跌到'} ${st.prob.toFixed(0)}%(上次 ${st.probLast.toFixed(0)}%)${st.after != null ? `・之後 10 日 ${B(st.after)}・${up9 ? (100 - st.back).toFixed(0) + '% 站穩' : st.back.toFixed(0) + '% 反彈回線上'}` : ''}`; }
+        rows.push(tr(`💰 ${up9 ? '漲回' : '跌回'}成本 <b>${fmt(cost)}</b>`, B(lockPct(cost)), `${st.prob.toFixed(0)}%`, st.after != null ? B(st.after) : '—', st.back != null ? `${(up9 ? 100 - st.back : st.back).toFixed(0)}%${up9 ? ' 站穩' : ' 反彈'}` : '—')); }
       { const st = sb.breakStat;
-        con += `<br>　📉 防守 <b>${fmt(stopPx0)}</b>${cost > 0 && !o.buyNow ? (stopPx0 < cost ? ' <span class="dxTag">停損線</span>' : ' <span class="dxTag up">鎖利線</span>') : ''} → 鎖 ${B(lockPct(stopPx0))}・20 日跌到 ${st.prob.toFixed(0)}%(上次 ${st.probLast.toFixed(0)}%)${st.after != null ? `・之後 10 日 ${B(st.after)}・${st.back.toFixed(0)}% 反彈回線上${st.backDays ? `(${st.backDays.toFixed(1)} 天)` : ''}` : ''}`; }
+        rows.push(tr(`📉 防守 <b>${fmt(stopPx0)}</b>${cost > 0 && !o.buyNow ? (stopPx0 < cost ? ' <span class="dxTag">停損</span>' : ' <span class="dxTag up">鎖利</span>') : ''}`, B(lockPct(stopPx0)), `${st.prob.toFixed(0)}%`, st.after != null ? B(st.after) : '—', st.back != null ? `${st.back.toFixed(0)}% 反彈${st.backDays ? '(' + st.backDays.toFixed(1) + '天)' : ''}` : '—')); }
+      if(lockBinds) rows.push(tr(`🔒 鎖利線 <b>${fmt(lockPx)}</b> <span class="dxTag up">${lockWhy}</span>`, B(lockPct(lockPx)), '—', '—', '—'));
+      con += `<div class="dxSub">🚪 出場線</div><table class="dxT">${th('線', '鎖定', '20 日觸及', '觸及後 10 日', '假跌破')}${rows.join('')}</table>`;
       let shares0 = 1000; try{ if(o.shares > 0) shares0 = Math.floor(o.shares); else if((localStorage.getItem('posMode') || 'A') === 'B'){ const s9 = Math.max(0, Math.floor(numIn($('posLots').value))) * 1000 + Math.max(0, Math.floor(numIn($('posOdd').value))); if(s9 > 0) shares0 = s9; } }catch(e){}
-      const planLine = (px, P) => { if(!P) return '';
-        const exitPnl = (cost > 0 && !o.buyNow) ? (px * (1 - 0.00585) - cost) * shares0 : null, rebuy = px * (1 + P.depthMed / 100);
-        const breakEven = exitPnl != null ? (rebuy + Math.max(0, -exitPnl) / shares0) / (1 - 0.00585) : null;
-        return `<br>　🔁 ${fmt(px)} 出場再接${exitPnl != null ? `(帳面 <b class="${exitPnl >= 0 ? 'up' : 'down'}">${exitPnl >= 0 ? '+' : ''}${$n(exitPnl)}</b>)` : ''}:再跌中位 ${P.depthMed.toFixed(0)}% → 接回 <b>${fmt(rebuy)}</b>・40 日回出場價 ${P.recover.toFixed(0)}%・「跌 ${P.bestX}% 接回」比抱著 ${B(P.bestEdge)}${breakEven ? `・接回後 ${fmt(breakEven)} 補平` : ''}`; };
-      con += (R.cost && sb.planCost && cost < pNow ? planLine(cost, sb.planCost) : '') + planLine(stopPx0, sb.planStop);
+      const P = sb.planStop;
+      if(P){ const rebuy = stopPx0 * (1 + P.depthMed / 100); const exitPnl = (cost > 0 && !o.buyNow) ? (stopPx0 * (1 - 0.00585) - cost) * shares0 : null;
+        con += `<div style="font-size:.9em;">🔁 破 ${fmt(stopPx0)} 出場再接:${K('再跌中位 ' + P.depthMed.toFixed(0) + '%')}${K('接回參考 ' + fmt(rebuy))}${K('40 日回出場價 ' + P.recover.toFixed(0) + '%')}${K('比抱著 ' + B(P.bestEdge))}${exitPnl != null ? K('出場帳面 ' + (exitPnl >= 0 ? '+' : '') + $n(exitPnl)) : ''}</div>`; }
+      // ④ 停利
       const tp1Pct = Math.max(mfe25, 2), tp1 = pNow * (1 + tp1Pct / 100);
       const tp2 = Math.min(hiC120, pNow * (1 + Math.max(mfe50, tp1Pct + 2) / 100));
-      con += `<br>🎯 <b>${cost > 0 && !o.buyNow && tp1 < cost ? '反彈減碼(未過成本)' : '部分停利'}</b> ① <span class="dxBig">${fmt(tp1)}</span>(${sg((tp1 / pNow - 1) * 100)}${cost > 0 && !o.buyNow ? '・對成本 ' + sg((tp1 / cost - 1) * 100) : ''})出 1/3　② <span class="dxBig">${fmt(tp2)}</span>(${sg((tp2 / pNow - 1) * 100)}${tp2 >= hiC120 - 0.001 ? '・封頂 ' + md(hiC120d) + ' 收盤高' : ''})出 1/3　餘跟防守`;
+      const tpLabel = cost > 0 && !o.buyNow && tp1 < cost ? '反彈減碼(未過成本)' : '部分停利';
+      // 停利價位看市場(歷史同狀態的最大漲幅、前高封頂),不看成本;成本決定「出多少」——賺越多、鎖越積極
+      const plT = (!o.buyNow && cost > 0 && pl != null) ? pl : null;
+      const sz = plT == null || plT < 10 ? ['出 1/3', '再出 1/3', '餘跟防守'] : plT < 20 ? ['出 1/2', '再出一半', '餘跟鎖利線'] : ['出 1/2', '出清或餘跟鎖利線', ''];
+      const preCut = plT != null && plT >= 20 && (dMa >= 8 || posNow >= 0.8 || blackBig) ? `<div>⚡ 獲利 ${sg(plT)} 且${dMa >= 8 ? '乖離 ' + sg(dMa) : posNow >= 0.8 ? '位在區間高檔' : '今日爆量收黑'}——先減 1/3 落袋,剩下照下面走</div>` : '';
+      con += `<div class="dxSub">🎯 ${tpLabel} <span class="dxTag" style="opacity:.8;">價位看市場,比例看你的利潤</span></div>${preCut}<div>① <span class="dxBig">${fmt(tp1)}</span> <span class="dxK">${sg((tp1 / pNow - 1) * 100)}${cost > 0 && !o.buyNow ? '・對成本 ' + sg((tp1 / cost - 1) * 100) : ''}</span> ${sz[0]}　② <span class="dxBig">${fmt(tp2)}</span> <span class="dxK">${sg((tp2 / pNow - 1) * 100)}${cost > 0 && !o.buyNow ? '・對成本 ' + sg((tp2 / cost - 1) * 100) : ''}${tp2 >= hiC120 - 0.001 ? '・封頂 ' + md(hiC120d) + ' 收盤高' : ''}</span> ${sz[1]}${sz[2] ? '　' + sz[2] : ''}</div>`;
       body += sec('🎯 結論', con);
+      advice.tp = `${preCut ? '先減 1/3 落袋;' : ''}① ${fmt(tp1)} ${sz[0]}、② ${fmt(tp2)} ${sz[1]}${sz[2] ? ',' + sz[2] : ''}`;
+      advice.expect = `20 日中位 ${sg(sb.hz[2].med)}、最差段 ${sg(sb.hz[2].s.worst)}(${sameReg ? '同劇本' : '同位階'} ${segN} 段)`;
     }
-    // ── 狀態 ──
-    // ── 技術上的好操作:一句主句 + 警示各自一行,做成醒目框 ──
-    const guard = stopOk ? `最終防守 <b class="dxBig">${fmt(stopUse)}</b>` : '<b class="down">目前無防守,依紀律不進場</b>';
-    // 追高警示要講對原因:貼近半年高、或半年區間高檔、或乖離月線太大——三件事分開講,不能 136 塊寫「貼近區間高 182」
+    // ═══ 🧭 技術上的好操作:進場/防守/停利/部位/期待,五行講完 ═══
+    const guardPx = stopOk ? fmt(finalStop) : null;
     const topWhy = [];
     if(nearHi <= 3) topWhy.push(`貼近半年高 ${fmt(hi120)}`); else if(posNow >= 0.8) topWhy.push(`半年區間高檔(${(posNow * 100).toFixed(0)}%)`);
     if(dMa >= 8) topWhy.push(`乖離月線 ${sg(dMa)}`);
-    const warnTop = topWhy.length ? `<br>⚠ ${topWhy.join('、')},若要進場最好分批不梭哈` : '';
-    const warnBlk = blackBig ? '<br>⚠ 今日高檔爆量收黑,先減一部分' : '';
-    let st9;
-    if(o.buyNow) st9 = `🛒 現價進場:${guard},停利到了分批減${warnTop}${warnBlk}`;
-    else if(pl == null) st9 = `${guard},不攤平${warnTop || '<br>距區間高 ' + fmt(hi120) + ' 還有 ' + nearHi.toFixed(1) + '%'}${warnBlk}`;
-    else if(legacy) st9 = `🧷 解套中長線單(曾跌到 ${fmt(lo120)}):「跌破就走」不適用,照上方減碼與出場線${warnBlk}`;
-    else if(pl < 0) st9 = `📉 浮虧 ${pl.toFixed(1)}%:${guard},不破就抱、不攤平${warnBlk}`;
-    else if(pl < 10) st9 = `🙂 小賺 +${pl.toFixed(1)}%:${guard},停利到了再減${warnBlk}`;
-    else st9 = `🎉 獲利 +${pl.toFixed(0)}%:${guard}(鎖利線跟漲),停利分批${warnBlk}${d.nh40 ? '<br>🚀 今日帶量創高,不急著減' : ''}`;
-    body += `<div class="dxDo"><div class="h">🧭 技術上的好操作</div><div>${st9}</div></div>`;
+    const sc9 = Number(d.score), structUp = isFinite(sc9) && sc9 >= 3;
+    const L = [];
+    if(o.buyNow || pl == null){
+      let en;
+      if(!stopOk) en = '目前破底無防守——順勢框架不進場,等打底+帶量站回月線';
+      else if(regNow === 'breakdown' || regNow === 'weak') en = `${REG[regNow]}——不接刀,只做反彈不做波段;真要買只放試單`;
+      else if(dMa >= 8) en = `乖離 ${sg(dMa)} 不追——等回測 10 日線/月線不破再進;等不及就先進 1/3`;
+      else if(topWhy.length) en = `${topWhy.join('、')}——分批進、不梭哈`;
+      else if(!structUp) en = `五燈 ${isFinite(sc9) ? sc9 : '?'}/5 結構未齊——等「回測月線不破+收紅」再進,不搶先`;
+      else if(blackBig) en = '今日高檔爆量收黑——不是進場日,等量縮再看';
+      else en = '結構 OK——可依計畫分批進場,先 1/2';
+      L.push(`🛒 <b>進場</b>:${en}`);
+    }else{
+      let st;
+      if(legacy) st = `解套中長線單(曾跌到 ${fmt(lo120)}):「跌破就走」不適用,${advice.cut ? '數據偏向' + advice.cut.split('——')[0] : '照出場線走'}`;
+      else if(pl < 0) st = `浮虧 ${pl.toFixed(1)}%:不攤平,${guardPx ? '守 ' + guardPx + ',不破就抱' : '無防守,反彈到月線減碼'}`;
+      else if(pl < 10) st = `小賺 ${sg(pl)}:${advice.cut ? '數據偏向' + advice.cut.split('——')[0] + ';' : ''}停利到了再減`;
+      else st = `獲利 ${sg(pl)}:鎖利線跟漲抬,${advice.cut ? '數據偏向' + advice.cut.split('——')[0] + ';' : ''}停利分批`;
+      L.push(`💼 <b>持倉</b>:${st}${blackBig ? ';⚠ 今日爆量收黑先減一部分' : ''}${d.nh40 ? ';🚀 帶量創高不急減' : ''}`);
+    }
+    L.push(`🛡 <b>防守</b>:${guardPx ? `最終防守 <b class="dxBig">${guardPx}</b>(${sg(-finalP)})${lockBinds ? `——🔒 ${lockWhy}` : ''},收盤跌破就走、不攤平` : '無有效防守'}`);
+    if(advice.tp) L.push(`🎯 <b>停利</b>:${advice.tp}`);
+    if(posSh >= 1 && stopOk){
+      if(lockBinds) L.push(`📦 <b>部位</b>:${qtyTxt} 跌到鎖利線仍賺 <b class="up">+${$n(posSh * (finalStop - cost))}</b>——這筆已經不會賠,剩下的是賺多賺少`);
+      else L.push(`📦 <b>部位</b>:${qtyTxt} 破守賠 <b class="down">${$n(posSh * (pNow - finalStop))}</b>——用「賠得起的錢 ÷ 每張 ${$n((pNow - finalStop) * 1000)}」決定張數`);
+    }
+    if(advice.expect) L.push(`📈 <b>期待</b>:${advice.expect}`);
+    body += `<div class="dxDo"><div class="h">🧭 技術上的好操作</div>${L.map(x => `<div>${x}</div>`).join('')}</div>`;
     const html = body + `<div class="dxDisc">⚠️ 歷史統計非預測;樣本為此股自身近三年價量,與使用 AI 與技術線圖提供之資訊。非正式投資建議,損益自負。</div>`;
     out.innerHTML = html;
     track('diag', {stock: d.id, n: sims.length});
@@ -3987,6 +4033,8 @@ async function run(auto){
       fetchPrices('TAIEX', warmStart, sellDate).catch(() => [])   // 加權指數(抓不到就略過)
     ]);
     if(!all || all.length < 2) throw new Error('此區間查無足夠交易資料,請確認代號與日期');
+    // 上下同步:下面算哪檔,上面的持倉計算欄位就換成哪檔(舊結果收起,避免看到不同檔的卡)
+    try{ const hs = $('hStock'); if(hs && resolveStockId(hs.value) !== stockId){ hs.value = `${stockId} ${name || ''}`.trim(); const ho = $('hOut'); if(ho) ho.style.display = 'none'; const hc0 = $('hCost'); if(hc0){ hc0.value = ''; hc0.dataset.now = ''; } } }catch(e){}
     // 剔除無效 K 棒:停牌日或資料錯誤造成的 0 價,若流入計算會讓股數與損益變成無限大
     const rawCount = all.length;
     const bars = all.filter(d => d.open > 0 && d.max > 0 && d.min > 0 && d.close > 0);
