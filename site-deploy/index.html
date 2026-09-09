@@ -361,7 +361,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-Q|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-R|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -383,7 +383,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-Q';
+const APP_VER = 'v20260909-R';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2113,15 +2113,13 @@ async function runDiag(o){
         rs.push({r5: c2[i + 5] / c2[i] - 1, r20: c2[i + 20] / c2[i] - 1, mae, mfe}); }
       if(rs.length >= 5 && segs >= 1){ const md = (arr) => { const s3 = [...arr].sort((a2, b2) => a2 - b2); return s3[Math.floor(s3.length / 2)] * 100; };
         regStat = {n: rs.length, segs, r5: md(rs.map(x2 => x2.r5)), r20: md(rs.map(x2 => x2.r20)), win20: rs.filter(x2 => x2.r20 > 0).length / rs.length * 100, mfe: md(rs.map(x2 => x2.mfe)), mae: md(rs.map(x2 => x2.mae))}; } }
-    // 相似日掃描:六階段自適應——先嚴(同劇本+位階 ±15pp+月線同側+距前高 ±6pp),找不到就逐步放寬:先放寬區間、再放掉劇本、最後放掉距前高
-    // 放到最後代表這檔近三年沒有處在同等位置過(例如崩跌 6 成後的盤整),要明講「參考價值打折」
-    const passes = [[0.15, 0.06, true, true], [0.25, 0.10, true, true], [0.35, 0.14, true, true], [0.35, 0, false, true], [0.50, 0, false, true], [1, 0, false, true],
-                    [0.35, 0.14, true, false], [0.35, 0, false, false], [0.50, 0, false, false]];
+    // 相似日掃描——兩套樣本,各司其職:
+    //  ① 同劇本樣本(simsR):回答「上次這齣戲怎麼演」——段數少也要講,但只當敘事,不當統計
+    //  ② 統計樣本(sims):算分布(回檔/再漲/勝率/沙盤)——同劇本樣本夠大(≥30 日、≥3 段)就用它,不夠就退回「同位階+同月線側」的廣樣本
+    //  一段行情不能當機率:華邦電上次反彈延伸崩了,不代表這次 95% 會崩——這是專業操盤手跟散戶最大的差別
     const nearMa = Math.abs(pNow / (ma20a[n2 - 1] || pNow) - 1) < 0.01;
-    let sims = [], segN = 0, relaxNote = '', sameReg = false;
-    for(let pi = 0; pi < passes.length; pi++){
-      const [band, ddBand, useDd, useReg] = passes[pi];
-      sims = [];
+    const scan = (band, ddBand, useDd, useReg) => {
+      const arr = [];
       for(let i = i0; i < n2 - 21; i++){
         if(useReg && regArr[i] !== regNow) continue;
         if(Math.abs(pctile(i) - posNow) > band) continue;
@@ -2129,22 +2127,34 @@ async function runDiag(o){
         if(useDd && Math.abs(ddHi(i) - ddNow) > ddBand) continue;
         let mae = 0, mfe = 0;
         for(let j = i + 1; j <= i + 20; j++){ mae = Math.min(mae, l2[j] / c2[i] - 1); mfe = Math.max(mfe, h2[j] / c2[i] - 1); }
-        sims.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe, i});
+        arr.push({r20: c2[i + 20] / c2[i] - 1, mae, mfe, i});
       }
-      // 獨立段:連續相似日視為同一段行情(間隔 >20 日才算新段)——段數才是真正的證據量
-      segN = 0; let lastI = -99, segLen = 0;
-      for(const x2 of sims){ if(x2.i - lastI > 20 || segLen >= 20){ segN++; segLen = 0; } x2.seg = segN; segLen++; lastI = x2.i; }
-      if(useReg ? (sims.length >= 15 && segN >= 2) : (sims.length >= 30 && segN >= 3)){
-        sameReg = useReg;
-        if(pi === 0) relaxNote = `<span class="dxTag up">同劇本・嚴格</span>`;
-        else if(pi <= 4) relaxNote = `<span class="dxTag" style="color:var(--gold);">同劇本・放寬</span>`;
-        else if(pi === 5) relaxNote = `<span class="dxTag" style="color:var(--gold);">只比劇本</span>`;
-        else relaxNote = `<span class="dxTag down">無同劇本歷史・打折</span>`;
-        break;
-      }
-    }
+      // 獨立段:連續相似日視為同一段行情(間隔 >20 日才算新段,單段最長 20 日)——段數才是真正的證據量
+      let sg9 = 0, lastI = -99, segLen = 0;
+      for(const x2 of arr){ if(x2.i - lastI > 20 || segLen >= 20){ sg9++; segLen = 0; } x2.seg = sg9; segLen++; lastI = x2.i; }
+      arr.segN = sg9; return arr;
+    };
+    let simsR = null, simsB = null, relR = -1;
+    for(const [pi, [band, ddBand, useDd]] of [[0.15, 0.06, true], [0.25, 0.10, true], [0.35, 0.14, true], [0.35, 0, false], [0.50, 0, false], [1, 0, false]].entries()){
+      const a9 = scan(band, ddBand, useDd, true); if(a9.length >= 15 && a9.segN >= 2){ simsR = a9; relR = pi; break; } }
+    if(!simsR){ const a9 = scan(1, 0, false, true); if(a9.length >= 5){ simsR = a9; relR = 9; } }
+    for(const [band, ddBand, useDd] of [[0.35, 0.14, true], [0.35, 0, false], [0.50, 0, false]]){
+      const a9 = scan(band, ddBand, useDd, false); if(a9.length >= 30 && a9.segN >= 3){ simsB = a9; break; } }
+    if(!simsB) simsB = scan(0.5, 0, false, false);
+    const rStrong = !!(simsR && simsR.length >= 30 && simsR.segN >= 3);
+    const sims = rStrong ? simsR : simsB, segN = sims.segN, sameReg = rStrong;
+    let relaxNote = rStrong
+      ? (relR === 0 ? `<span class="dxTag up">同劇本・嚴格</span>` : relR === 5 ? `<span class="dxTag" style="color:var(--gold);">只比劇本</span>` : `<span class="dxTag" style="color:var(--gold);">同劇本・放寬</span>`)
+      : (simsR ? `<span class="dxTag" style="color:var(--gold);">同劇本僅 ${simsR.segN} 段 ${simsR.length} 日,統計改用同位階廣樣本</span>` : `<span class="dxTag down">無同劇本歷史,用同位階廣樣本</span>`);
     if(sims.length < 5){ out.innerHTML = `歷史上跟現在同狀態的日子只有 ${sims.length} 個——連參考都算不出來,以結構防守為主。`; return; }
     if(sims.length < 30 || segN < 3) relaxNote += `<span class="dxTag" style="color:var(--gold);">⚠ 樣本偏少(${sims.length} 日・${segN} 段),結果自行斟酌</span>`;
+    // 🕰 上次同劇本那段(敘事用):直接算那段的 5/10/20 日與最高/最深,不經過統計樣本
+    let lastR = null;
+    { const src9 = simsR || sims; const lastId = src9.length ? src9[src9.length - 1].seg : -1; const seg9 = src9.filter(x2 => x2.seg === lastId);
+      if(seg9.length){ const fee9 = 0.00585, mean9 = arr => arr.reduce((a2, b2) => a2 + b2, 0) / arr.length * 100;
+        const rH = H => mean9(seg9.map(x2 => c2[x2.i + H] / c2[x2.i] * (1 - fee9) - 1));
+        lastR = {from: bars[seg9[0].i].date, to: bars[seg9[seg9.length - 1].i].date, n: seg9.length, r5: rH(5), r10: rH(10), r20: rH(20), up: Math.max(...seg9.map(x2 => x2.mfe)) * 100, dd: Math.min(...seg9.map(x2 => x2.mae)) * 100, reg: REG[regArr[seg9[seg9.length - 1].i]] || '過渡期', same: !!simsR}; } }
+
     const q = (arr, p3) => { const s3 = [...arr].sort((a2, b2) => a2 - b2); return s3[Math.min(s3.length - 1, Math.floor(s3.length * p3))]; };
     const rs2 = sims.map(x2 => x2.r20), maes = sims.map(x2 => x2.mae), mfes = sims.map(x2 => x2.mfe);
     const win = rs2.filter(r3 => r3 > 0).length / sims.length * 100;
@@ -2208,7 +2218,11 @@ async function runDiag(o){
     // ── 沙盤(20 天視角,四條規則,每條給:上次那段/三年段加權/最差段)——續抱、立即減半、回成本出場、跌破防守出場 ──
     let sb = null;
     if(stopS > 0 && stopS < pNow){
-      const dsRaw = (pNow - stopS) / pNow, ds = Math.max(dsRaw, -mae50 / 100), fee = 0.00585;
+      // 防守:結構線(月線/前低)是紀律線;只有當它比日常振幅還近(盤中就會掃到)才退到「次層支撐」或 1.5 倍日振幅,最多 12%——不拿單一崩盤段把防守推到 15% 外
+      const dsRaw = (pNow - stopS) / pNow, fee = 0.00585;
+      const ampD = (Number(d.amp) || 0) / 100, altS = Number(d.altStop) || 0;
+      let ds = dsRaw;
+      if(ampD > 0 && dsRaw < ampD * 0.8){ const altD = (altS > 0 && altS < pNow) ? (pNow - altS) / pNow : 0; ds = Math.min(0.12, Math.max(dsRaw, altD > 0 ? altD : ampD * 1.5)); }
       const used = sims.filter(x2 => x2.i < n2 - 21);   // 20 天視角:短線的人要的是接下來一個月
       const cutI = n2 - 250;
       const kC = (!o.buyNow && cost > 0 && pNow > 0) ? cost / pNow : 0;   // 現價買入:沒有「回成本」這條線
@@ -2318,11 +2332,13 @@ async function runDiag(o){
     };
     const biasNow = (pNow / (ma20a[n2 - 1] || pNow) - 1) * 100;
     const stopOk = stopS > 0 && stopS < pNow, dsPct = stopOk ? (pNow - stopS) / pNow * 100 : 0;
-    const stopTag = !stopOk ? '<span class="down">破底中・無防守</span>' : dsPct < -mae50 ? '<span class="down">⚠ 太緊,當沖用</span>' : dsPct > -mae25 ? '<span style="color:var(--gold);">偏寬</span>' : '<span class="up">✓ 合理</span>';
-    const stopUse = sb ? pNow * (1 - sb.ds) : stopS;   // 波段防守(統計帶修正後)
+    const ampP = Number(d.amp) || 0;
+    const stopUse = sb ? pNow * (1 - sb.ds) : stopS;   // 實際採用的防守(結構線;太貼日振幅時退一層)
+    const useP = stopOk ? (pNow - stopUse) / pNow * 100 : 0;
+    const stopTag = !stopOk ? '<span class="down">破底中・無防守</span>' : (ampP > 0 && useP < ampP * 0.8) ? '<span class="down">⚠ 比日振幅還近,盤中易掃</span>' : useP > 12 ? '<span style="color:var(--gold);">偏寬,賠得多</span>' : '<span class="up">✓ 可執行</span>';
     // ── 四格重點 ──
     let tiles = tile('🎬 劇本', REG[regNow], `乖離 ${sg(biasNow)}・距一年高 ${sg(ddNow * 100)}`, 'var(--accent)')
-      + tile('🛡 防守', stopOk ? fmt(stopUse) : '—', stopOk ? `${sg(-(pNow - stopUse) / pNow * 100)} ${stopTag}${sb && stopUse > stopS + 0.001 ? `<br>結構 ${fmt(stopS)} 太緊,退到統計帶` : ''}` : stopTag)
+      + tile('🛡 防守', stopOk ? fmt(stopUse) : '—', stopOk ? `${sg(-useP)} ${stopTag}${sb && stopUse < stopS - 0.001 ? `<br>結構線 ${fmt(stopS)}(${sg(-dsPct)})比日振幅 ${ampP.toFixed(1)}% 近,退一層` : ''}` : stopTag)
       + tile('📦 部位', posSh >= 1 ? qtyTxt : '未設', posSh >= 1 ? `${$n(posSh * pNow)} 元${stopOk ? `・破守賠 <b class="down">${$n(posSh * (pNow - stopUse))}</b>` : ''}` : '上方填張數')
       + (o.buyNow ? tile('💼 現價買入', fmt(pNow), '假設現在成交', 'var(--gold)')
         : cost > 0 ? tile('💼 持倉', sg(pl), `成本 ${fmt(cost)} → ${fmt(pNow)}${legacy ? '・解套單' : ''}`, pl >= 0 ? 'var(--red)' : 'var(--green)')
@@ -2339,6 +2355,15 @@ async function runDiag(o){
       if(tl.length >= 2) regBody += `<br><span style="font-size:.85em; opacity:.85;">🧭 ${tl.join(' → ')}</span>`; }catch(e){}
     if(regStat) regBody += `<br>📚 同劇本 ${regStat.segs} 段:${K('5 日 ' + B(regStat.r5))}${K('20 日 ' + B(regStat.r20))}${K('勝率 ' + regStat.win20.toFixed(0) + '%')}${K('最高 +' + regStat.mfe.toFixed(0) + '%')}${K('最深 ' + regStat.mae.toFixed(0) + '%')}${regStat.mfe >= 6 && regStat.r20 < regStat.mfe - 4 ? '<span class="dxTag" style="color:var(--gold);">漲得到、抱不住</span>' : ''}`;
     else regBody += `<br><span style="opacity:.75;">📚 這檔三年內同劇本歷史太少,以規則為準</span>`;
+    // 🚦 五燈(結構)與歷史(賠率)對照:兩者不同方向不是打架,是各說各的——結構給方向,歷史給賠率;歷史樣本小就降權
+    try{ const sc = Number(d.score), nI = Number(d.nItems) || 5; if(isFinite(sc) && lastR){
+      const structUp = sc >= 3, histBad = lastR.r20 < -5 || (regStat && regStat.win20 < 40), histGood = lastR.r20 > 5 || (regStat && regStat.win20 >= 60);
+      let line = '';
+      if(structUp && histBad) line = `五燈 ${sc}/${nI} 結構偏多,但這檔上次${lastR.same ? '同劇本' : '同位階'}(${md(lastR.from)})之後 20 日 ${sg(lastR.r20)}——<b>結構給方向、歷史給賠率</b>;${lastR.same && simsR && simsR.segN < 3 ? '歷史只有 ' + simsR.segN + ' 段,權重放低,' : ''}用結構線當防守、部位縮小,不因為一段歷史放棄順勢`;
+      else if(!structUp && histGood) line = `五燈 ${sc}/${nI} 結構未齊,但歷史同狀態偏多——等結構補齊(回測月線+收紅)再進,不搶先`;
+      else if(structUp && histGood) line = `五燈 ${sc}/${nI} 與歷史同向偏多——順勢主場,照防守與停利執行`;
+      else if(!structUp && histBad) line = `五燈 ${sc}/${nI} 與歷史同向偏空——順勢框架這裡不出手`;
+      if(line) regBody += `<br>🚦 ${line}`; } }catch(e){}
     body += sec('🎬 劇本', regBody);
     // ── 股性 ──
     body += sec('📊 股性', `${segN} 段・${sims.length} 日 ${relaxNote}<br>${K('平常回檔 ' + mae50.toFixed(1) + '%')}${K('較深 ' + mae25.toFixed(1) + '%')}${K('通常再漲 +' + mfe50.toFixed(1) + '%')}${K('強一點 +' + mfe75.toFixed(1) + '%')}`);
@@ -2351,14 +2376,14 @@ async function runDiag(o){
       const R = Object.fromEntries(sb.rules.map(r5 => [r5.k, r5]));
       const kC = R.cost ? cost / pNow : 0;
       let con = '';
-      if(ls){
-        const lsReg = REG[regArr[bars.findIndex(b9 => b9.date === ls.to)] || 'other'];
-        con += `🕰 <b>上次同狀態</b> ${md(ls.from)}~${md(ls.to)}(${ls.n} 日${sameReg ? '' : '・當時是' + lsReg}${ls.n < 5 ? '・樣本短' : ''}):${sb.hz.map(z => K(z.H + ' 日 ' + B(z.s.last))).join('')}${K('最高 +' + ls.up.toFixed(0) + '%')}${K('最深 ' + ls.dd.toFixed(0) + '%')}${ls.up >= 8 && ls.r < ls.up - 6 ? '<span class="dxTag" style="color:var(--gold);">先漲後回吐</span>' : ''}`;
-        if(cost > 0 && !o.buyNow) con += `<br>　↳ 對成本 ${fmt(cost)}:${K('20 日 ' + B(toC(ls.r)))}${K('最高時 ' + B(toC(ls.up)))}${K('最深時 ' + B(toC(ls.dd)))}`;
+      const LR = lastR;
+      if(LR){
+        con += `🕰 <b>上次${LR.same ? '同劇本' : '同位階'}</b> ${md(LR.from)}~${md(LR.to)}(${LR.n} 日${LR.same ? '' : '・當時是' + LR.reg}${LR.n < 5 ? '・樣本短' : ''}):${K('5 日 ' + B(LR.r5))}${K('10 日 ' + B(LR.r10))}${K('20 日 ' + B(LR.r20))}${K('最高 +' + LR.up.toFixed(0) + '%')}${K('最深 ' + LR.dd.toFixed(0) + '%')}${LR.up >= 8 && LR.r20 < LR.up - 6 ? '<span class="dxTag" style="color:var(--gold);">先漲後回吐</span>' : ''}<span class="dxTag" style="opacity:.8;">一段行情,不是機率</span>`;
+        if(cost > 0 && !o.buyNow) con += `<br>　↳ 對成本 ${fmt(cost)}:${K('20 日 ' + B(toC(LR.r20)))}${K('最高時 ' + B(toC(LR.up)))}${K('最深時 ' + B(toC(LR.dd)))}`;
       }
-      con += `<br>📅 <b>全部同狀態 20 日</b>:${K('勝率 ' + sb.hz[2].win.toFixed(0) + '%')}${K('中位 ' + B(sb.hz[2].med))}${K('最差段 ' + B(sb.hz[2].s.worst))}`;
+      con += `<br>📅 <b>統計樣本 20 日</b>(${sameReg ? '同劇本' : '同位階・不分劇本'} ${segN} 段・${sims.length} 日):${K('勝率 ' + sb.hz[2].win.toFixed(0) + '%')}${K('中位 ' + B(sb.hz[2].med))}${K('最差段 ' + B(sb.hz[2].s.worst))}`;
       if(o.buyNow){
-        con += `<br>🛒 <b>現價買進後</b>:` + sb.hz.map(z => `<br>　${z.H} 日 → 上次 ${B(z.s.last)}・勝率 ${z.win.toFixed(0)}%・中位 ${B(z.med)}・最差段 ${B(z.s.worst)}`).join('');
+        con += `<br>🛒 <b>現價買進後</b>:` + sb.hz.map((z, zi) => `<br>　${z.H} 日 → 上次那段 ${B(LR ? [LR.r5, LR.r10, LR.r20][zi] : z.s.last)}・勝率 ${z.win.toFixed(0)}%・中位 ${B(z.med)}・最差段 ${B(z.s.worst)}`).join('');
       }else if(R.hold && R.half){
         const hL = toC(R.hold.s.last), hW = toC(R.hold.s.worst), fL = toC(R.half.s.last), fW = toC(R.half.s.worst);
         const midH = (hL + hW) / 2, midF = (fL + fW) / 2;
