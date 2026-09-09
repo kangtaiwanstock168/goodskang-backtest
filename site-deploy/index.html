@@ -361,7 +361,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-P|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-Q|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -383,7 +383,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-P';
+const APP_VER = 'v20260909-Q';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -652,6 +652,7 @@ function updateDcaHint(){
   updateDcaHint();
   // 模式化排序:話題雷達+強勢雷達永遠置頂;持倉或買入計算=計算卡緊接雷達;看一檔=表單優先;存股回測=表單優先+完整回測展開。模式記在 localStorage,分享連結一律進「看一檔」
   try{ applyModeOrder(); }catch(e){}
+  try{ renderHotChips(); }catch(e){}   // 預設熱門按鈕先亮,雷達載到再補
   // 分享連結進站:完整重現分享者當下的所有設定(股票、日期、資金、加碼、比較股)
   let fromShare = false;
   try{
@@ -1874,20 +1875,26 @@ function setMode(m){
   else { const el = $('stockId'); el.scrollIntoView({behavior: 'smooth', block: 'center'}); setTimeout(() => el.focus(), 400); if(m === 'long'){ const dw = $('deepWrap'); if(dw) dw.open = true; } }
 }
 // 🔥 熱門股連動:強勢股雷達掃出來的名單,同步餵給「持倉或買入計算」的預設按鈕與「熱門一鍵回測」(0050、正2 固定,其餘跟著雷達走)
+// 🔥 熱門股連動:固定常客(0050/正2/台積電/聯電/華邦電)一進站就有;強勢股雷達與話題雷達載到就往後接——雷達失敗也不會整排消失
 function renderHotChips(hot){
+  window.__chipPool = window.__chipPool || {hot: [], topic: []};   // 初始化 IIFE 比這段程式碼早跑,池子要在函式內建
+  const CHIP_FIXED = [['0050', '元大台灣50', '0050'], ['00631L', '元大台灣50正2', '正2'], ['2330', '台積電', '台積電'], ['2303', '聯電', '聯電'], ['2344', '華邦電', '華邦電']];
   const esc = t => String(t || '').replace(/[<>'"*]/g, '').trim();
-  const list = (hot || []).filter(h => h && h.id).slice(0, 8);
-  if(!list.length) return;
+  if(Array.isArray(hot) && hot.length) window.__chipPool.hot = hot;
+  const seen = new Set(), list = [];
+  const add = (id, name, lb) => { if(!id || seen.has(id)) return; seen.add(id); list.push({id, name: esc(name || id), lb: esc(lb || name || id)}); };
+  for(const [id, nm, lb] of CHIP_FIXED) add(id, nm, lb);
+  for(const h of window.__chipPool.hot.slice(0, 6)) add(h.id, h.name);      // 強勢股前 6
+  for(const t of window.__chipPool.topic.slice(0, 6)) add(t.id, t.name);    // 話題股前 6
   const hc = $('hChips');
   if(hc){
-    hc.innerHTML = '🔥 今天熱門(點了直接帶入):' + list.map(h => `<button type="button" class="chip" style="padding:4px 12px; margin:2px 4px 2px 0;" onclick="hPick('${h.id} ${esc(h.name || h.id)}')">${esc(h.name || h.id)}</button>`).join('');
+    hc.innerHTML = '🔥 熱門(點了直接帶入):' + list.slice(0, 18).map(h => `<button type="button" class="chip" style="padding:4px 12px; margin:2px 4px 2px 0;" onclick="hPick('${h.id} ${h.name}')">${h.lb}</button>`).join('');
     hc.style.display = 'block';
   }
   const qc = $('quickChips');
   if(qc){
-    const fixed = [['0050 元大台灣50', '0050'], ['00631L 元大台灣50正2', '正2']];
-    const dyn = list.filter(h => h.id !== '0050' && h.id !== '00631L').slice(0, 6).map(h => [`${h.id} ${esc(h.name || h.id)}`, esc(h.name || h.id)]);
-    qc.innerHTML = '🔥 熱門一鍵回測:' + fixed.concat(dyn).map(([v, lb]) => `<button type="button" class="chip" onclick="quickRun('${v}')">${lb}</button>`).join('');
+    const dyn = list.slice(2, 10);   // 0050、正2 固定在前,其餘跟著雷達走
+    qc.innerHTML = '🔥 熱門一鍵回測:' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join('');
   }
 }
 function hPick(v){ const hs = $('hStock'); if(!hs) return; hs.value = v; $('suggest3').style.display = 'none'; $('hCost').focus(); }
@@ -3042,6 +3049,7 @@ async function renderTopic(){
         + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div></div>`;
     };
     // 首屏開胃菜:電腦 5 張、手機 6 張——別把輸入框推出視野;其餘的放「更多話題股」補到 15
+    try{ window.__chipPool = window.__chipPool || {hot: [], topic: []}; window.__chipPool.topic = top.slice(0, 8).map(x => ({id: x.id, name: nameOf(x.id)})); renderHotChips(); }catch(e){}   // 話題股也進熱門按鈕
     const topN = window.innerWidth <= 640 ? 6 : 5;
     box.innerHTML = top.slice(0, topN).map(mkCard).join('');
     $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——完整前 15 名在下方「更多話題股」。${fromCache ? '|📡 目前為快取資料,背景更新中' : ''}`;
