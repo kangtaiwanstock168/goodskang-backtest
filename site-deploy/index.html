@@ -149,6 +149,7 @@
     .chip{padding:9px 16px; font-size:.9rem;}   /* 拇指點得到的大小 */
   }
   .subtitle{font-size:.8rem; color:var(--muted); margin:-8px 0 14px;}
+  .dxChart{background:#0d1117; border:1px solid var(--border); border-radius:10px; padding:8px 4px 4px; margin:0 0 10px;} .dxChart canvas{display:block;} .dxLg{display:flex; flex-wrap:wrap; gap:4px 12px; padding:4px 8px 0; font-size:.76rem; color:var(--muted);} .dxLg i{display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:4px;}
   .dxTiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:6px 0 10px;}
   .dxTile{background:rgba(88,166,255,.05); border:1px solid var(--border); border-radius:10px; padding:8px 10px; line-height:1.4;}
   .dxTile .l{font-size:.75rem; color:var(--muted);} .dxTile .v{font-size:1.15rem; font-weight:800;} .dxTile .s{font-size:.8rem; color:var(--muted); margin-top:2px; line-height:1.5;}
@@ -365,7 +366,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-U|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-V|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -387,7 +388,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-U';
+const APP_VER = 'v20260909-V';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2358,7 +2359,8 @@ async function runDiag(o){
       + (o.buyNow ? tile('💼 現價買入', fmt(pNow), '假設現在成交', 'var(--gold)')
         : cost > 0 ? tile('💼 持倉', sg(pl), `成本 ${fmt(cost)} → ${fmt(pNow)}${legacy ? '・解套單' : ''}`, pl >= 0 ? 'var(--red)' : 'var(--green)')
         : tile('💼 持倉', '未填成本', '只算防守與部位'));
-    let body = `<div class="dxTiles">${tiles}</div>`;
+    let body = `<div class="dxTiles">${tiles}</div><div class="dxChart"><canvas id="${out.id}_chart"></canvas><div class="dxLg" id="${out.id}_lg"></div></div>`;
+    let chartTP = null;   // 停利①②在結論區才算得出來,先留位子給圖用
     // ── 位階 ──
     body += sec('📍 位階', `${posTxt} ${K(nearMa ? '月線附近' : aboveNow ? '月線上' : '月線下')}${K('距一年高 ' + sg(ddNow * 100))}${K('乖離 ' + sg(biasNow))}${splitNote2 ? `<br><span style="font-size:.85em; opacity:.7;">${splitNote2}</span>` : ''}`);
     // ── 劇本:規則一句 + 近 40 日演變 + 同劇本歷史 ──
@@ -2437,6 +2439,7 @@ async function runDiag(o){
       const tp1Pct = Math.max(mfe25, 2), tp1 = pNow * (1 + tp1Pct / 100);
       const tp2 = Math.min(hiC120, pNow * (1 + Math.max(mfe50, tp1Pct + 2) / 100));
       const tpLabel = cost > 0 && !o.buyNow && tp1 < cost ? '反彈減碼(未過成本)' : '部分停利';
+      chartTP = [tp1, tp2];
       // 停利價位看市場(歷史同狀態的最大漲幅、前高封頂),不看成本;成本決定「出多少」——賺越多、鎖越積極
       const plT = (!o.buyNow && cost > 0 && pl != null) ? pl : null;
       const sz = plT == null || plT < 10 ? ['出 1/3', '再出 1/3', '餘跟防守'] : plT < 20 ? ['出 1/2', '再出一半', '餘跟鎖利線'] : ['出 1/2', '出清或餘跟鎖利線', ''];
@@ -2481,6 +2484,22 @@ async function runDiag(o){
     body += `<div class="dxDo"><div class="h">🧭 技術上的好操作</div>${L.map(x => `<div>${x}</div>`).join('')}</div>`;
     const html = body + `<div class="dxDisc">⚠️ 歷史統計非預測;樣本為此股自身近三年價量,與使用 AI 與技術線圖提供之資訊。非正式投資建議,損益自負。</div>`;
     out.innerHTML = html;
+    // 📈 計畫卡的圖:近 60 日還原 K + 月線/季線 + 成本/防守/鎖利/停利線 + 底部劇本色帶
+    try{
+      const segsTL = []; { let prev = '', run = 0, runStart = 0;
+        for(let i = Math.max(60, n2 - 60); i < n2; i++){ const r9 = regArr[i]; if(r9 === 'other') continue;
+          if(run > 0 && r9 === regArr[i - 1]) run++; else { run = 1; runStart = i; }
+          if(r9 !== prev && (run >= 2 || r9 === 'overext')){ segsTL.push({i: runStart, k: r9, t: REG[r9]}); prev = r9; } } }
+      const lines = [];
+      if(cost > 0 && !o.buyNow) lines.push({p: cost, t: '成本', c: '#d29922', dash: [6, 4]});
+      if(stopOk){ lines.push({p: finalStop, t: lockBinds ? '鎖利線(最終防守)' : '防守', c: lockBinds ? '#3fb950' : '#58a6ff', dash: [5, 4]});
+        if(lockBinds) lines.push({p: stopUse, t: '結構線', c: '#58a6ff', dash: [2, 4], thin: true}); }
+      if(chartTP){ lines.push({p: chartTP[0], t: '停利①', c: '#f85149', dash: [6, 4]}); if(chartTP[1] > chartTP[0] * 1.002) lines.push({p: chartTP[1], t: '停利②', c: '#f85149', dash: [2, 4], thin: true}); }
+      if(hiC120 > pNow * 1.005 && !(chartTP && Math.abs(chartTP[1] - hiC120) < hiC120 * 0.002)) lines.push({p: hiC120, t: '半年高', c: '#8b949e', dash: [1, 4], thin: true});
+      window.__dxChart = window.__dxChart || {}; window.__dxChart[out.id] = {bars: bars.slice(-60), closes: c2, total: n2, pNow, lines, segs: segsTL, regNow, REG};
+      drawDxChart(out.id);
+      if(!window.__dxResize){ window.__dxResize = true; let tmr; window.addEventListener('resize', () => { clearTimeout(tmr); tmr = setTimeout(() => { for(const k of Object.keys(window.__dxChart || {})) drawDxChart(k); }, 150); }); }
+    }catch(e){ console.warn('dxChart', e); }
     track('diag', {stock: d.id, n: sims.length});
   }catch(e){ out.innerHTML = '診斷失敗(資料源忙線),稍後再試。'; }
 }
@@ -3445,6 +3464,66 @@ function taChecklist(s, instNet){
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
+function drawDxChart(outId){
+  const S = window.__dxChart && window.__dxChart[outId]; const canvas = $(outId + '_chart'); if(!S || !canvas || !canvas.parentElement) return;
+  const bars = S.bars, n = bars.length; if(n < 10) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth || 600, H = 300;
+  canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+  const padL = 6, padR = 118, padT = 14, bandH = 18, pBot = H - bandH - 22;
+  const RED = '#f85149', GREEN = '#3fb950', GOLD = '#d29922', MUT = '#8b949e', ACC = '#58a6ff', CYAN = '#39c5cf';
+  // 價格範圍:K 棒 + 落在現價 ±30% 內的線都要看得到
+  let lo = Math.min(...bars.map(b => b.min)), hi = Math.max(...bars.map(b => b.max));
+  const vis = S.lines.filter(L => L.p > S.pNow * 0.7 && L.p < S.pNow * 1.3);
+  for(const L of vis){ lo = Math.min(lo, L.p); hi = Math.max(hi, L.p); }
+  const rng0 = (hi - lo) || 1; lo -= rng0 * 0.06; hi += rng0 * 0.06;
+  const y = v => padT + (hi - v) / (hi - lo) * (pBot - padT);
+  const x = i => padL + (i + 0.5) * (W - padL - padR) / n;
+  const cw = Math.max(2, (W - padL - padR) / n * 0.62);
+  g.font = '10px sans-serif'; g.textBaseline = 'middle'; g.lineWidth = 1;
+  // 線的標籤先排位(太近就往下錯開),刻度標籤遇到線標籤就讓路
+  const used = [];
+  const place = yy => { let t = Math.min(pBot - 6, Math.max(8, yy)); for(let k = 0; k < 8; k++){ if(used.every(u => Math.abs(u - t) >= 12)) break; t += 12; } used.push(t); return t; };
+  vis.sort((a, b) => a.p - b.p); for(const L of vis) L.ty = place(y(L.p));
+  for(let k = 0; k <= 4; k++){ const v = hi - (hi - lo) * k / 4, yy = y(v);
+    g.strokeStyle = 'rgba(139,148,158,.14)'; g.beginPath(); g.moveTo(padL, yy); g.lineTo(W - padR, yy); g.stroke();
+    if(used.every(u => Math.abs(u - yy) >= 11)){ g.fillStyle = MUT; g.fillText(fmt(v), W - padR + 4, yy); } }
+  // 劇本色帶(底部)
+  const RC = {overext: '#f85149', rebound: '#3fb950', rebound2: '#3fb950', lowRange: '#58a6ff', breakdown: '#f85149', topOsc: '#d29922', trendUp: '#f85149', pullback: '#d29922', range: '#58a6ff', weak: '#8b949e', other: '#30363d'};
+  const base = S.total - n, bTop = pBot + 6;
+  if(S.segs.length){
+    const segs = S.segs.map(sg9 => ({...sg9, li: Math.max(0, sg9.i - base)})).filter((sg9, k, arr) => k === 0 || sg9.li > arr[k - 1].li);
+    for(let k = 0; k < segs.length; k++){ const a = segs[k].li, b = k + 1 < segs.length ? segs[k + 1].li : n;
+      const x0 = x(a) - cw / 2, x1 = x(b - 1) + cw / 2; const col = RC[segs[k].k] || MUT;
+      g.fillStyle = col; g.globalAlpha = .22; g.fillRect(x0, bTop, x1 - x0, bandH); g.globalAlpha = 1;
+      g.fillStyle = col; const tw = g.measureText(segs[k].t).width; if(x1 - x0 > tw + 6) g.fillText(segs[k].t, x0 + 4, bTop + bandH / 2); }
+  }
+  // 日期刻度
+  g.fillStyle = MUT; for(let i = 0; i < n; i += Math.ceil(n / 5)){ g.fillText(String(bars[i].date).slice(5).replace('-', '/'), x(i) - 12, H - 8); }
+  // K 棒
+  for(let i = 0; i < n; i++){ const b = bars[i], col = b.close >= b.open ? RED : GREEN; g.strokeStyle = col; g.fillStyle = col;
+    g.beginPath(); g.moveTo(x(i), y(b.max)); g.lineTo(x(i), y(b.min)); g.stroke();
+    g.fillRect(x(i) - cw / 2, y(Math.max(b.open, b.close)), cw, Math.max(1, Math.abs(y(b.open) - y(b.close)))); }
+  // 月線 / 季線
+  const ma = (len, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); let st = false;
+    for(let i = 0; i < n; i++){ const gi = base + i; if(gi < len - 1) continue; let t = 0; for(let j = gi - len + 1; j <= gi; j++) t += S.closes[j]; const yy = y(t / len);
+      if(yy < padT - 2 || yy > pBot + 2){ st = false; continue; } if(!st){ g.moveTo(x(i), yy); st = true; } else g.lineTo(x(i), yy); }
+    g.stroke(); g.lineWidth = 1; };
+  ma(20, GOLD, 1.8); ma(60, CYAN, 1.3);
+  // 水平線 + 右側標籤
+  for(const L of vis){
+    const yy = y(L.p); g.setLineDash(L.dash || []); g.strokeStyle = L.c; g.lineWidth = L.thin ? 1 : 1.5;
+    g.beginPath(); g.moveTo(padL, yy); g.lineTo(W - padR, yy); g.stroke(); g.setLineDash([]); g.lineWidth = 1;
+    const ty = L.ty; g.fillStyle = L.c; g.fillText(`${L.t} ${fmt(L.p)}`, W - padR + 4, ty);
+    if(Math.abs(ty - yy) > 6){ g.strokeStyle = L.c; g.globalAlpha = .5; g.beginPath(); g.moveTo(W - padR, yy); g.lineTo(W - padR + 3, ty); g.stroke(); g.globalAlpha = 1; }
+  }
+  // 現價
+  { const yy = y(S.pNow); g.fillStyle = ACC; g.beginPath(); g.arc(x(n - 1), yy, 3.5, 0, Math.PI * 2); g.fill();
+    const tx = x(n - 1) - 34, tyy = Math.max(8, yy - 12); g.fillStyle = 'rgba(13,17,23,.85)'; g.fillRect(tx - 2, tyy - 6, 26, 12); g.fillStyle = ACC; g.fillText('現價', tx, tyy); }
+  // 圖例
+  const lg = $(outId + '_lg'); if(lg){ const it = [['月線', GOLD], ['季線', CYAN]].concat(vis.map(L => [L.t, L.c])); lg.innerHTML = it.map(([t, c]) => `<span><i style="border-color:${c};"></i>${t}</span>`).join('') + `<span style="margin-left:auto;">近 60 日還原價・底部色帶=劇本</span>`; }
+}
 function drawKChart(canvas, bars, ck){
   if(!canvas || !bars || bars.length < 10 || !ck) return;
   const dpr = window.devicePixelRatio || 1;
