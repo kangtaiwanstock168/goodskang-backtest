@@ -366,7 +366,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-V|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-W|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -388,7 +388,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-V';
+const APP_VER = 'v20260909-W';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -508,14 +508,26 @@ function attachCombo(inp, box, runOnEnter){
     if(!stockList){ show('loading'); await loadStockList(); }
     const q2 = inp.value.trim().toUpperCase();
     if(!q2){ box.style.display='none'; syncSuggestSpace(box); return; }
-    const pre = [], mid = [];
+    const pre = [], nameStart = [], mid = [];   // 排序:代號開頭 → 名稱開頭(打「友」先出友達)→ 名稱包含(日友、友尚…)
     for(const s of stockList){
+      const nm = s.name.toUpperCase();
       if(s.id.startsWith(q2)) pre.push(s);
-      else if(s.name.toUpperCase().includes(q2)) mid.push(s);
+      else if(nm.startsWith(q2)) nameStart.push(s);
+      else if(nm.includes(q2)) mid.push(s);
     }
-    show(pre.concat(mid).slice(0, 30));
+    // 名稱開頭同字的,今天雷達上的熱門股與上市 4 碼股先出(打「友」:友達在強勢股就排第一,DR/興櫃排後)
+    const hotSet = new Set(); try{ for(const k of ['hot', 'topic']) for(const h of ((window.__chipPool || {})[k] || [])) hotSet.add(h.id); }catch(e){}
+    const rank = s => (hotSet.has(s.id) ? 0 : 10) + (/^\d{4}$/.test(s.id) ? 0 : 1);
+    nameStart.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+    show(pre.concat(nameStart, mid).slice(0, 30));
   }
-  inp.addEventListener('input', onInput);
+  // ── 注音/拼音輸入法:選字的 Enter 不是「送出」──
+  // 打「ㄧㄡˇ」還在組字時 input 事件會拿到注音符號,Enter 是在選「友」,不能拿去選第一檔股票。
+  // 用 compositionstart/end 記狀態;Safari 在 compositionend 之後才送 Enter 的 keydown,所以再留 80ms 緩衝。
+  let composing = false, composedAt = 0;
+  inp.addEventListener('compositionstart', () => { composing = true; });
+  inp.addEventListener('compositionend', () => { composing = false; composedAt = Date.now(); onInput(); });
+  inp.addEventListener('input', e => { if(composing || (e && e.isComposing)) return; onInput(); });
   inp.addEventListener('focus', onInput);
   box.addEventListener('mousedown', e => {
     const t = e.target.closest('div[data-id]');
@@ -523,6 +535,7 @@ function attachCombo(inp, box, runOnEnter){
   });
   inp.addEventListener('keydown', e => {
     if(e.key !== 'Enter') return;
+    if(composing || e.isComposing || e.keyCode === 229 || Date.now() - composedAt < 80) return;   // 輸入法選字中:讓輸入法處理
     e.preventDefault();
     const first = box.querySelector('div[data-id]');
     if(box.style.display !== 'none' && first){
