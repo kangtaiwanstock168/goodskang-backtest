@@ -366,7 +366,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-X|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-Y|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -388,7 +388,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-X';
+const APP_VER = 'v20260909-Y';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -4070,7 +4070,27 @@ async function renderAiInsight(stockId, name){
           const ann = +(ytd * per[1]).toFixed(2);                              // 今年年化
           const ttm = eq.length >= 4 ? +eq.slice(-4).reduce((a2, b2) => a2 + b2.value, 0).toFixed(2) : null;   // 近四季
           const qLabel = ({3: '第一季', 6: '上半年', 9: '前三季', 12: '全年'})[mth] || '';
-          if(ann > 0 && lastC > 0){
+          // 🎭 轉機/題材股:EPS 貼近損益兩平(年化 <0.5 元或本益比 ≥60 倍)——本益比是「用小數點除出來的大數字」,拿它跟台積電 25 倍比毫無意義(友達 0.06 元 → 624 倍)
+          // 這種股票市場用「淨值比 + 轉型劇本」定價,改用交易所公告的股價淨值比與它自己 8 個月的區間來體檢
+          if(ann > 0 && lastC > 0 && (ann < 0.5 || lastC / ann >= 60)){
+            let pbr = null;
+            try{ const pj = await fmData(`dataset=TaiwanStockPER&data_id=${stockId}&start_date=${fs2}&end_date=${end}`); const since = (Array.isArray(s) && s.length) ? s[0].date : fs2; const pd = (pj.data || []).filter(r2 => isFinite(r2.PBR) && r2.PBR > 0 && r2.date >= since).sort((a2, b2) => a2.date.localeCompare(b2.date));   // 跟上面「近 8 個月」價格區間同一段
+              if(pd.length >= 20){ const L = pd[pd.length - 1], lo4 = Math.min(...pd.map(r2 => r2.PBR)), hi4 = Math.max(...pd.map(r2 => r2.PBR)); pbr = {v: L.PBR, per: L.PER, yld: L.dividend_yield, date: L.date, lo: lo4, hi: hi4, pos: Math.round(hi4 > lo4 ? (L.PBR - lo4) / (hi4 - lo4) * 100 : 50)}; } }catch(e){}
+            const pe0 = lastC / ann, yoy = eq.length >= 8 ? eq.slice(-per[0]).reduce((a2, b2) => a2 + b2.value, 0) - eq.slice(-per[0] - 4, -4).reduce((a2, b2) => a2 + b2.value, 0) : null;
+            let tone, tc;
+            if(pbr && pbr.pos >= 90){ tone = `🚨 <b>淨值比已貼近它自己 8 個月的高點(${pbr.hi.toFixed(2)} 倍)</b>——市場已經先把轉型劇本漲進價格裡;這裡漲跌不看財報,看劇本有沒有繼續兌現與籌碼;追價風險此刻最大,防守要抓得比平常緊`; tc = 'var(--red)'; }
+            else if(pbr && pbr.pos >= 60){ tone = `🔶 <b>淨值比在自家區間偏高段(${pbr.pos.toFixed(0)}%)</b>——題材已反映一部分,還沒到前高;這種股票的主角是劇本與籌碼,不是 EPS,照五燈與防守走`; tc = '#ffd23f'; }
+            else if(pbr){ tone = `⚖️ <b>淨值比在自家區間中低段(${pbr.pos.toFixed(0)}%)</b>——市場還沒給轉型劇本太多溢價;要注意「便宜」是因為獲利還沒出來,漲要等題材,跌也沒有獲利撐——用結構防守,不用估值撐`; tc = 'var(--gold)'; }
+            else { tone = `⚠️ 抓不到交易所淨值比資料,這檔只能以結構與籌碼看,不做估值判讀`; tc = 'var(--muted)'; }
+            peHtml = `<div style="${subBox} margin-top:12px;">`
+              + `<p style="font-weight:700; margin:0 0 8px; color:var(--gold);">🎭 估值體檢——轉機/題材股模式(財報自動抓取)</p>`
+              + `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">今年${qLabel} EPS <b>${ytd.toFixed(2)} 元</b> → 年化約 ${ann.toFixed(2)} 元${ttm != null ? `|近四季 ${ttm.toFixed(2)} 元` : ''}${yoy != null ? `|較去年同期 <b class="${yoy >= 0 ? 'up' : 'down'}">${yoy >= 0 ? '+' : ''}${yoy.toFixed(2)} 元</b>` : ''}——<b>獲利貼近損益兩平,本益比 ${pe0 >= 1000 ? '>1000' : pe0.toFixed(0)} 倍是小數點除出來的數字,沒有參考性</b>,市場現在是用「轉型劇本 + 淨值」在定價,不是用 EPS</p>`
+              + (pbr ? `<p style="margin:6px 0; line-height:1.8; font-size:.95rem;">交易所公告股價淨值比 <b style="color:${tc}; font-size:1.05rem;">${pbr.v.toFixed(2)} 倍</b>(${pbr.date.slice(5).replace('-', '/')})|近 8 個月 ${pbr.lo.toFixed(2)}~${pbr.hi.toFixed(2)} 倍——目前落在區間 <b>${pbr.pos.toFixed(0)}%</b>${isFinite(pbr.per) && pbr.per > 0 ? `|交易所本益比 ${pbr.per.toFixed(0)} 倍(近四季)` : ''}${isFinite(pbr.yld) ? `|殖利率 ${pbr.yld.toFixed(2)}%` : ''}</p>` : '')
+              + `<p style="margin:8px 0 0; line-height:1.8; font-size:.95rem; color:${tc};">${tone}</p>`
+              + `<p class="hint" style="margin-top:8px;">依公開財報與交易所公告自動計算;淨值比區間僅為事實紀錄,非目標價、不構成任何價位預測。轉機股的獲利若真的出來,估值模式會自動切回本益比。</p></div>`;
+            pillHtml = `<span class="pill">🎭 <b style="color:${tc};">轉機/題材股</b>${pbr ? ` 淨值比 ${pbr.v.toFixed(2)} 倍` : ''}</span><span id="pePill"></span>`;
+          }
+          else if(ann > 0 && lastC > 0){
             const pe = lastC / ann;
             const hi2 = Math.max(...s.map(d2 => d2.max)), lo3 = Math.min(...s.map(d2 => d2.min));
             const peHi = hi2 / ann, peLo = lo3 / ann;
