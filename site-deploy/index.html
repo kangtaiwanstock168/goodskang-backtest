@@ -366,7 +366,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-W|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20260909-X|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -388,7 +388,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-W';
+const APP_VER = 'v20260909-X';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2119,7 +2119,7 @@ async function runDiag(o){
       if(cp < m20 && slope < -0.03 && cp <= lo20 * 1.03) return 'breakdown';
       if(pct >= 0.75 && dd >= -0.10 && Math.abs(slope) < 0.02) return 'topOsc';
       if(cp > m20 && slope >= 0.02) return 'trendUp';
-      if(cp <= m20 && slope >= 0 && dd >= -0.15) return 'pullback';
+      if(cp <= m20 && slope >= 0 && (dd >= -0.15 || (slope >= 0.03 && cp >= m20 * 0.95))) return 'pullback';   // 月線上彎 3%+、只是貼著月線的小回檔,就算離一年高還遠也是多頭回檔(聯電 10/06)
       if(Math.abs(slope) < 0.02 && pct >= 0.25 && pct <= 0.75) return 'range';
       if(cp < m20 && slope < 0) return 'weak';
       return 'other';
@@ -3406,7 +3406,16 @@ function taChecklist(s, instNet){
     // 不論趨勢標籤,改用「近期回檔低點/月線/近10日低點」中低於現價的較高者當實務防守
     // (陰跌盤沒有標準 ±2 微底、月線又在頭上時,近10日低點是最後的保底候選)
     const r10 = s.length >= 12 ? Math.min(...s.slice(-11, -1).map(b2 => b2.min)) : 0;
-    const cand = [trailLow, ma20, r10].filter(v => v > 0 && v < last.close);
+    // 🔎 次級回檔底:波段 ZigZag 門檻(最高 6.5%)會把「上漲中途 -6% 的回檔」當雜訊,但那個回檔低點(聯電 9/25 的 139)正是多頭最後一個墊高的底——
+    // 現價跌破近 10 日低點時,先找近 60 日內「±3 根局部低點、在現價之下、距現價 ≤12%」最近的一個,有就是實務防守,不能直接判「破底、無防守」
+    // 轉折用「收盤」找(±3 根收盤最低那天),防守用那根 K 的最低價——聯電 9/15 收 138.5 是起漲前的回檔底,防守 138
+    let minorLow = 0;
+    for(let k = n - 4; k >= Math.max(3, n - 60); k--){
+      const lo0 = s[k].min; if(!(lo0 < last.close * 0.995 && lo0 >= last.close * 0.88)) continue;
+      let ok = true; for(let j = k - 3; j <= k + 3; j++){ if(j === k || j < 0 || j >= n) continue; if(c[j] < c[k]){ ok = false; break; } }
+      if(ok){ minorLow = lo0; break; }
+    }
+    const cand = [trailLow, ma20, r10, minorLow].filter(v => v > 0 && v < last.close);
     if(cand.length){
       const up2 = Math.max(...cand);
       if(up2 > lastLow){ farNote = `;結構上的前波底 ${fmt(lastLow)} 距現價超過 12%,拿它當防守形同不設防——改用實務防守`; lastLow = up2; trailing = true; }
