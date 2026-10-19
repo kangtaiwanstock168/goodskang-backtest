@@ -93,6 +93,20 @@
   .up{color:var(--red);}   /* 台股習慣:漲=紅 */
   .down{color:var(--green);}
   .gold{color:var(--gold);}
+  /* 決策卡與策略總表 */
+  .dcTiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:10px 0 12px;}
+  .dcTile{background:rgba(13,17,23,.55); border:1px solid var(--border); border-radius:10px; padding:10px 12px; line-height:1.45;}
+  .dcTile .l{font-size:.75rem; color:var(--muted);} .dcTile .v{font-size:1.2rem; font-weight:800; margin:2px 0;} .dcTile .s{font-size:.82rem; color:var(--muted);}
+  .dcT{border-collapse:collapse; width:100%; margin:6px 0 4px; font-size:.9rem;}
+  .dcT th,.dcT td{padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;}
+  .dcT th{color:var(--muted); font-weight:600; font-size:.78rem;} .dcT td:first-child,.dcT th:first-child{text-align:left; white-space:normal;}
+  .dcT tr.champ td{color:var(--gold); font-weight:700;} .dcT tr.lazy td:first-child::before{content:'💤 ';}
+  .dcQ{margin-top:10px; padding:10px 12px; border-radius:10px; background:rgba(88,166,255,.08); border:1px solid rgba(88,166,255,.35); font-size:.92rem; line-height:1.75;}
+  details.card>summary{list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  details.card>summary::-webkit-details-marker{display:none;}
+  details.card>summary h2{margin:0; flex:1;} details.card>summary .sbadge{font-size:.82rem; color:var(--muted); white-space:nowrap;}
+  details.card>summary::after{content:'▸'; color:var(--muted); font-size:1.1rem; transition:transform .15s;} details.card[open]>summary::after{transform:rotate(90deg);}
+  details.card>summary+*{margin-top:12px;}
   .best-box{border:1px solid var(--gold); border-radius:10px; padding:16px; margin-top:16px; background:rgba(210,153,34,.07);}
   .best-box h3{color:var(--gold); font-size:1rem; margin-bottom:8px;}
   .best-box p{font-size:.92rem; line-height:1.7;}
@@ -295,52 +309,52 @@
       <p class="subtitle" style="margin-top:8px;">💡 小技巧:點一下上方圖例(收盤價、M5、M20、M60、台股大盤加權指數)可以<b style="color:var(--text);">隱藏/顯示</b>該條線——例如只留收盤價和大盤,對照最清楚。</p>
       <p class="subtitle" id="ddNote" style="margin-top:8px;"></p>
     </div>
-    <div class="card">
-      <h2 class="section">💰 策略一:固定每月 5 日加碼(發薪日定期定額)</h2>
+    <details class="card strat">
+      <summary><h2 class="section">💰 策略一:固定每月 5 日加碼(發薪日定期定額)</h2><span class="sbadge" id="sb1"></span></summary>
       <p class="subtitle">初始資金進場後,每月 5 日固定加碼(遇假日順延至下一個開盤日)——不看盤、不猜底,領薪水就買:</p>
       <div class="swipe-hint">👈 表格可左右滑動 👉</div>
       <div class="tbl-wrap"><table id="monthlyTable"></table></div>
-    </div>
-    <div class="card">
-      <h2 class="section">📉 策略二:單筆進場+預留現金,等回檔狙擊 All in(買進後不停利)</h2>
+    </details>
+    <details class="card strat">
+      <summary><h2 class="section">📉 策略二:單筆進場+預留現金,等回檔狙擊 All in(買進後不停利)</h2><span class="sbadge" id="sb2"></span></summary>
       <p class="subtitle">散戶沒有上帝視角——與其猜最低點,不如單筆進場後口袋預留一筆現金,設好「從波段高點回檔 X% 或跌破均線」的紀律,觸發當天把預留現金<b>一次 All in</b>,之後抱到期末。總投入 = 初始資金 + 預留現金;整段沒觸發的門檻顯示 N/A(現金閒置):</p>
       <div class="swipe-hint">👈 表格可左右滑動 👉</div>
       <div class="tbl-wrap"><table id="stratTable"></table></div>
       <p class="subtitle" id="stratNote" style="margin-top:12px;"></p>
-    </div>
-    <div class="card">
-      <h2 class="section">🧩 策略三:定期定額+回檔狙擊 All in(雙資金流,買進後不停利)</h2>
+    </details>
+    <details class="card strat">
+      <summary><h2 class="section">🧩 策略三:定期定額+回檔狙擊 All in(雙資金流,買進後不停利)</h2><span class="sbadge" id="sb3"></span></summary>
       <p class="subtitle">資金拆三份的完整打法——初始資金第一天進場、定期定額每月 5 日照買(同策略一)、另外預留一筆現金等回檔:觸發門檻當天把預留現金<b>一次 All in</b>,之後全部抱到期末。總投入 = 初始資金 + 定期定額 + 預留現金;沒觸發的門檻顯示 N/A(對照組就是策略二的邏輯加上定期定額):</p><!-- 策略三副標 -->
       <div class="swipe-hint">👈 表格可左右滑動 👉</div>
       <div class="tbl-wrap"><table id="comboTable"></table></div>
       <p class="subtitle" id="comboNote" style="margin-top:12px;"></p>
-    </div>
-    <div class="card">
-      <h2 class="section">🔁 策略四:會分批停利 & 回檔接回(初始資金單筆)</h2>
+    </details>
+    <details class="card strat">
+      <summary><h2 class="section">🔁 策略四:會分批停利 & 回檔接回(初始資金單筆)</h2><span class="sbadge" id="sb4"></span></summary>
       <p class="subtitle">賺到就先走一趟,回檔再接回來——回測「獲利達 X% 就停利、之後原損益資金不動、從賣出後的高點回檔 Y% 接回」的紀律,在此波段能否勝過抱到底。以初始資金單筆進出模擬(不含每月加碼);停利賣出後的本金與損益,會在接回時全數再投入,每格為期末報酬與進出趟數。停利門檻最高只列到 200%——抱得過 200% 還不賣的,就是抱到底派,直接看基準列:</p>
       <div class="swipe-hint">👈 表格可左右滑動 👉</div>
       <div class="tbl-wrap"><table id="swingTable"></table></div>
       <p class="subtitle" id="swingNote" style="margin-top:12px;"></p>
-    </div>
-    <div class="card">
-      <h2 class="section">🔁 策略五:會定期定額 & 分批停利 & 回檔接回(最累)</h2>
+    </details>
+    <details class="card strat">
+      <summary><h2 class="section">🔁 策略五:會定期定額 & 分批停利 & 回檔接回(最累)</h2><span class="sbadge" id="sb5"></span></summary>
       <p class="subtitle">資金流與策略一相同(初始資金+每月 5 日定期加碼):持股時每月照買;持有部位獲利達 X%(以平均成本計)就全數停利;空手時新資金先進現金池,等股價從賣出後的高點回檔 Y%,現金池(本利和+累積加碼)全數接回,每格為期末報酬與進出趟數。停利門檻最高只列到 200%——抱得過 200% 還不賣的,就是抱到底派,直接看基準列:</p>
       <div class="swipe-hint">👈 表格可左右滑動 👉</div>
       <div class="tbl-wrap"><table id="swingTable4"></table></div>
       <p class="subtitle" id="swingNote4" style="margin-top:12px;"></p>
-    </div>
-    <div class="card">
-      <h2 class="section">🔒 策略六:停利獲利落袋,出場後不再進場(落袋為安)</h2>
+    </details>
+    <details class="card strat">
+      <summary><h2 class="section">🔒 策略六:停利獲利落袋,出場後不再進場(落袋為安)</h2><span class="sbadge" id="sb6"></span></summary>
       <p class="subtitle">最保守的打法——初始資金單筆進場;獲利達 X% 就<b>全數停利出場、獲利落袋,之後不再進場</b>(提早獲利了結的人,通常很難再追回去)。出場後以現金保留至期末:</p>
       <div class="swipe-hint">👈 表格可左右滑動 👉</div>
       <div class="tbl-wrap"><table id="swingTable5"></table></div>
       <p class="subtitle" id="swingNote5" style="margin-top:12px;"></p>
-    </div>
-    <div class="card">
-      <h2 class="section">投入明細</h2>
+    </details>
+    <details class="card strat">
+      <summary><h2 class="section">📒 投入明細(各策略每一筆買賣)</h2><span class="sbadge">點開看</span></summary>
       <p class="subtitle" id="buyTableSub"></p>
       <div id="buyTables"></div>
-    </div>
+    </details>
     <p style="text-align:center; margin:4px 0 10px;"><button type="button" class="chip" onclick="doShare()">📤 覺得這份回測有料?分享給你的股友</button></p>
   </div>
 
@@ -366,7 +380,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20260909-Y|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20261019-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -388,7 +402,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20260909-Y';
+const APP_VER = 'v20261019-A';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -421,6 +435,8 @@ const ddZonePlugin = {
 };
 const fmt = (n,d=2) => n.toLocaleString('zh-TW',{minimumFractionDigits:d, maximumFractionDigits:d});
 const money = n => Math.round(n).toLocaleString('zh-TW');
+// 大數字縮寫:決策卡與總表用(明細表仍用完整數字)——58,644,248 → 5,864 萬;1,268,529 → 126.9 萬;億以上 → 1.23 億
+const moneyW = n => { const a = Math.abs(n), sg = n < 0 ? '-' : ''; if(a >= 1e8) return sg + (a / 1e8).toFixed(2) + ' 億'; if(a >= 1e7) return sg + Math.round(a / 1e4).toLocaleString('zh-TW') + ' 萬'; if(a >= 1e6) return sg + (a / 1e4).toFixed(1) + ' 萬'; return sg + Math.round(a).toLocaleString('zh-TW'); };
 const pct = n => (n>=0?'+':'') + n.toFixed(2) + '%';
 const cls = n => n>=0 ? 'up' : 'down';
 const FEE = 0.001425, TAX = 0.003;
@@ -1535,19 +1551,46 @@ function renderBuyTables(data, monthly, pull, swing3, swing4, swing5, combo, lum
     ${selfCheck}<br><br>
     不過${CN[stratCount]}種打法各有適合的個性:選一個你執行得下去的,<br>比選報酬最高的更重要。`;
 
-  // 開頭版:一按回測就先看到,並引導往下滑(策略五表格在下方)
-  $('summaryBox').innerHTML = `<div class="best-box" style="margin-top:0;"><h3>📌 綜合結語</h3>
-    <p>${summaryCore.replaceAll('{S5POS}','下方')}<br><br>
-    <span style="color:var(--muted);">※ 過去績效不代表未來,僅供參考,不構成投資建議。<br>往下滑看${CN[stratCount]}種策略的完整回測 👇</span></p></div>`;
+  // ═══ 📌 決策卡:三格看完 + 六策略總表 + 兩題 ═══(取代舊的兩份 9,000 字綜合結語)
+  const lazyGapTxt = (() => {
+    if(!lazyBase) return '';
+    if(lazyBase === champProf || lazyBase.profit >= champProf.profit) return `<b class="up">躺平就好</b>——不研究的定期定額直接勝過所有操作`;
+    const g = champProf.ret - lazyBase.ret;
+    if(champProf.profit <= 0) return `<b class="down">全盤皆虧</b>——差距只是傷得深淺,控制部位比選策略重要`;
+    if(lazyBase.profit <= 0) return `<b class="gold">要帶紀律</b>——無腦買是虧的,冠軍是賺的`;
+    if(g < 5) return `<b>差 ${g.toFixed(1)}%,躺平不吃虧</b>——值不值得盯盤自己衡量`;
+    if(g < 15) return `<b class="gold">差 ${g.toFixed(1)}%,有操作價值</b>——懶要付一點代價`;
+    return `<b class="gold">差 ${g.toFixed(1)}%,操作獎勵很大</b>——純躺會錯過不少`;
+  })();
+  const stratRows = [
+    ...byProf.map((c, i) => ({name: c.name, ret: c.ret, profit: c.profit, inv: c.inv, champ: c === profTop, lazy: c.name === mName, medal: MEDALS[i]})),
+    ...(swing5 ? [{name: '停利落袋(不再進場)', ret: swing5.ret, profit: swing5.profit, inv: swing5.inv, medal: '🔒', note: swing5.tp != null ? `獲利 ${swing5.tp}% 出場` : '未觸發'}] : []),
+    ...(lumpHold ? [{name: '單筆 All in 抱到底(躺平對照)', ret: lumpHold.ret, profit: lumpHold.profit, inv: lumpHold.inv, medal: '🛋️'}] : [])
+  ];
+  const stratTable = `<table class="dcT"><tr><th>打法</th><th>報酬率</th><th>損益</th><th>總投入</th></tr>` + stratRows.map(r => `<tr class="${r.champ ? 'champ' : ''}${r.lazy ? ' lazy' : ''}"><td>${r.medal} ${r.name}${r.note ? ` <span style="color:var(--muted); font-size:.8em;">(${r.note})</span>` : ''}</td><td class="${cls(r.ret)}">${pct(r.ret)}</td><td class="${cls(r.profit)}">${(r.profit >= 0 ? '+' : '') + moneyW(r.profit)}</td><td style="color:var(--muted);">${moneyW(r.inv)}</td></tr>`).join('') + `</table>`;
+  const ddV = monthly.dd || 0;
+  const credTile = isEtf ? `<div class="dcTile"><div class="l">🔬 ETF 結果可信度</div><div class="v" style="color:${credLv.c};">${credLv.t}</div><div class="s">${days} 個交易日・${credLv.d}</div></div>` : `<div class="dcTile"><div class="l">⏳ 回測長度</div><div class="v">${days} 日</div><div class="s">約 ${days >= 250 ? (days / 252).toFixed(1) + ' 年' : monthsN + ' 個月'}${days < 120 ? '・單一區間,運氣成分高' : days < 250 ? '・建議換兩組日期再驗' : '・涵蓋多空,較能外推'}</div></div>`;
+  $('summaryBox').innerHTML = `<div class="best-box" style="margin-top:0;"><h3 style="margin:0;">📌 決策卡——這檔的答案,三格看完</h3>
+    <div class="dcTiles">
+      <div class="dcTile"><div class="l">🏆 此波段最會賺的打法</div><div class="v gold" style="font-size:1rem;">${profTop.name}</div><div class="s"><b class="${cls(profTop.ret)}">${pct(profTop.ret)}</b>・${(profTop.profit >= 0 ? '+' : '') + moneyW(profTop.profit)}${retTop !== profTop ? `<br>報酬率冠軍:${retTop.name}(${pct(retTop.ret)})` : ''}</div></div>
+      <div class="dcTile"><div class="l">💤 躺平 vs 操作</div><div class="v" style="font-size:1rem;">${lazyGapTxt || '—'}</div><div class="s">${lazyBase ? `定期定額 ${pct(lazyBase.ret)}` : ''}${lumpHold ? `・單筆抱到底 ${pct(lumpHold.ret)}` : ''}</div></div>
+      <div class="dcTile"><div class="l">📉 這檔的脾氣</div><div class="v down">-${ddV.toFixed(1)}%</div><div class="s">波段最大回檔——帳面跌這麼深你抱得住嗎?</div></div>
+      ${credTile}
+    </div>
+    <div style="font-size:.82rem; color:var(--muted); margin:0 0 2px;">${CN[stratCount]}種打法成績總表(依損益排序;點下方各策略可展開完整表格)</div>
+    ${stratTable}
+    <div class="dcQ">🪞 <b>下單前兩題</b><br>1️⃣ 這筆錢放多久?一年以上、不想盯盤 → 定期定額或抱到底;只做幾個月 → 才考慮停利與狙擊。<br>2️⃣ 最大回檔 <b class="down">-${ddV.toFixed(1)}%</b> 抱得住嗎?抱不住就分批進、留現金,睡得著比賺得快重要。</div>
+    <p class="hint" style="margin:10px 0 0;">🎯 冠軍是「事後」從幾十種參數挑出的最佳解,實戰不可能每次選中——冠軍只贏懶人一點點時,選執行得下去的。${isEtf ? '' : ' ' + horizonNote.replace(/<[^>]+>/g, '')}<br>※ 過去績效不代表未來,非投資建議。</p></div>`;
 
-  // 結尾版:重溫結論 + 阿康的話 + 再測一檔(策略五表格在上方)
-  html += `<div class="best-box" style="margin-top:22px;"><h3>📌 回測結論(幫你複習一次)</h3>
-    <p>${summaryCore.replaceAll('{S5POS}','上方')}<br><br>
-    回測不會預言未來,但能讓你認識一檔股票的脾氣——下次進場前,先來這裡跑一遍,你會更清楚自己買的是什麼、該用什麼節奏抱它。<br>
-    這個工具是阿康用 AI 一步一步打造的,還會持續加新功能、修得更好用。覺得有幫上忙的話,到下面訂閱追蹤阿康,就是對我最大的支持 🙏<br><br>
+  // 結尾版:只留阿康的話 + 再測一檔(結論已在上方決策卡,不重複)
+  html += `<div class="best-box" style="margin-top:22px;"><h3>🙏 阿康的話</h3>
+    <p>回測不會預言未來,但能讓你認識一檔股票的脾氣——下次進場前,先來這裡跑一遍,你會更清楚自己買的是什麼、該用什麼節奏抱它。<br>
+    這個工具是阿康用 AI 一步一步打造的,還會持續加新功能、修得更好用。覺得有幫上忙的話,到下面訂閱追蹤阿康,就是對我最大的支持 🙏<br>
     <span style="color:var(--muted);">※ 過去績效不代表未來,僅供參考,不構成投資建議。</span></p>
     <button id="retestBtn" style="display:block; margin:18px auto 4px; max-width:320px;">🔄 再測一檔股票</button></div>`;
-
+  // 各策略收合卡的摘要徽章(標題旁一眼看到成績)
+  try{ const bd = (id, c) => { const el = $(id); if(el && c) el.innerHTML = `<b class="${cls(c.ret)}">${pct(c.ret)}</b>・${(c.profit >= 0 ? '+' : '') + moneyW(c.profit)}${c === profTop ? ' 👑' : ''}`; };
+    bd('sb1', monthly); bd('sb2', pull); bd('sb3', combo); bd('sb4', swing3); bd('sb5', swing4); bd('sb6', swing5); }catch(e){}
   $('buyTables').innerHTML = html;
   $('retestBtn').onclick = () => {
     window.scrollTo({top:0, behavior:'smooth'});
@@ -1955,7 +1998,7 @@ async function runHold(){
     let ck = null; try{ ck = taChecklist(s, R.instNet); }catch(e){}
     if(!ck){ out.innerHTML = '<span class="down">檢查表計算失敗,請稍後再試。</span>'; return; }
     const d = {id, nm, date: R.end, p: lastC, price: fmt(lastC), pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ck.verdict, items: ck.items,
-      stop: ck.lastLow, amp: ck.amp10, altStop: ck.altStop, nh40: !!ck.nh40, score: ck.score, nItems: ck.nItems};
+      stop: ck.lastLow, brokeStop: !!ck.brokeStop, amp: ck.amp10, altStop: ck.altStop, nh40: !!ck.nh40, score: ck.score, nItems: ck.nItems};
     const light = ck.verdict.includes('不利') ? '<b class="down">不利 🔴</b>' : ck.verdict.includes('友善') ? '<b class="up">友善 🟢</b>' : ck.verdict.includes('買點浮現') ? '<b class="up">買點浮現 🟢</b>'
       : ck.verdict.includes('爆出漲停') ? '<b class="up">攻擊發起 🟠</b>' : ck.verdict.includes('醞釀') ? '<b style="color:var(--gold);">醞釀 🟡</b>' : ck.verdict.includes('作頭') ? '<b class="down">警戒 🟠</b>' : '<b style="color:var(--gold);">中性 🟡</b>';
     const lastBar = s[s.length - 1];
@@ -1963,7 +2006,7 @@ async function runHold(){
     const sub = 'background:rgba(88,166,255,.03); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-top:8px;';
     out.innerHTML = `<div style="margin-bottom:4px;"><span class="pill"><b>${d.nm}</b> ${fmt(lastC)} <b class="${cls(d.pct)}">${pct(d.pct)}</b> <span style="opacity:.7;">(${whenTxt})</span></span>`
       + `<span class="pill">五燈 ${ck.score}/${ck.nItems} ${light}</span>`
-      + (ck.breakdown ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>` : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ck.lastLow)}</b></span>`)
+      + (ck.brokeStop ? `<span class="pill">⛔ <b class="down">已跌破防守 ${fmt(ck.lastLow)}</b></span>` : ck.breakdown ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>` : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ck.lastLow)}</b></span>`)
       + (ck.nh40 ? `<span class="pill" style="border-color:var(--red);">🚀 <b class="up">創新高帶量</b></span>` : '') + `</div>`
       + `<div style="${sub}"><p style="font-weight:700; margin:0 0 4px; font-size:.92rem;">📦 部位與風險</p><div id="hPos" class="hint" style="line-height:1.75;"></div></div>`
       + `<div style="${sub}"><p style="font-weight:700; margin:0 0 4px; font-size:.92rem;">📋 交易計畫卡</p><div id="hDx" class="hint" style="line-height:1.75;">⏳ 抓三年還原價,統計中…</div></div>`
@@ -2032,7 +2075,7 @@ function calcPos(){
   if(!(cap > 0)){ out.textContent = '請先輸入總資金。'; return; }
   try{ localStorage.setItem('posCap', String(cap)); localStorage.setItem('posRisk', String(riskPct)); }catch(e){}
   if(!(price > 0) || !(stop > 0) || stop >= price){
-    out.innerHTML = '目前無有效防守位(破底中或資料不足)——<b>依紀律此處不進場</b>,沒有可計算的倉位。';
+    out.innerHTML = d.brokeStop ? `⛔ 現價已跌破防守 ${fmt(Number(d.stop))}——買進依據失效,<b>依紀律此處不進場</b>,沒有可計算的倉位。` : '目前無有效防守位(破底中或資料不足)——<b>依紀律此處不進場</b>,沒有可計算的倉位。';
     return;
   }
   const riskAmt = cap * riskPct / 100, per = price - stop;
@@ -2356,7 +2399,7 @@ async function runDiag(o){
     const ampP = Number(d.amp) || 0;
     const stopUse = sb ? pNow * (1 - sb.ds) : stopS;   // 實際採用的防守(結構線;太貼日振幅時退一層)
     const useP = stopOk ? (pNow - stopUse) / pNow * 100 : 0;
-    const stopTag = !stopOk ? '<span class="down">破底中・無防守</span>' : (ampP > 0 && useP < ampP * 0.8) ? '<span class="down">⚠ 比日振幅還近,盤中易掃</span>' : useP > 12 ? '<span style="color:var(--gold);">偏寬,賠得多</span>' : '<span class="up">✓ 可執行</span>';
+    const stopTag = !stopOk ? (d.brokeStop ? `<span class="down">已跌破 ${fmt(stopS)}</span>` : '<span class="down">破底中・無防守</span>') : (ampP > 0 && useP < ampP * 0.8) ? '<span class="down">⚠ 比日振幅還近,盤中易掃</span>' : useP > 12 ? '<span style="color:var(--gold);">偏寬,賠得多</span>' : '<span class="up">✓ 可執行</span>';
     // 🔒 鎖利線:防守價位看市場(結構線),但「賺多少要鎖多少」看你的成本——獲利 ≥10% 至少保本(含費)、≥20% 鎖住一半利潤;取結構線與鎖利線較高者當最終防守
     let lockPx = 0, lockWhy = '';
     if(!o.buyNow && cost > 0 && pl != null && stopOk){
@@ -2471,7 +2514,7 @@ async function runDiag(o){
     const L = [];
     if(o.buyNow || pl == null){
       let en;
-      if(!stopOk) en = '目前破底無防守——順勢框架不進場,等打底+帶量站回月線';
+      if(!stopOk) en = d.brokeStop ? `現價已跌破防守 ${fmt(stopS)}——買進依據失效,順勢框架不進場;等收復 ${fmt(stopS)} 或出現新的底` : '目前破底無防守——順勢框架不進場,等打底+帶量站回月線';
       else if(regNow === 'breakdown' || regNow === 'weak') en = `${REG[regNow]}——不接刀,只做反彈不做波段;真要買只放試單`;
       else if(dMa >= 8) en = `乖離 ${sg(dMa)} 不追——等回測 10 日線/月線不破再進;等不及就先進 1/3`;
       else if(topWhy.length) en = `${topWhy.join('、')}——分批進、不梭哈`;
@@ -2487,7 +2530,7 @@ async function runDiag(o){
       else st = `獲利 ${sg(pl)}:鎖利線跟漲抬,${advice.cut ? '數據偏向' + advice.cut.split('——')[0] + ';' : ''}停利分批`;
       L.push(`💼 <b>持倉</b>:${st}${blackBig ? ';⚠ 今日爆量收黑先減一部分' : ''}${d.nh40 ? ';🚀 帶量創高不急減' : ''}`);
     }
-    L.push(`🛡 <b>防守</b>:${guardPx ? `最終防守 <b class="dxBig">${guardPx}</b>(${sg(-finalP)})${lockBinds ? `——🔒 ${lockWhy}` : ''},收盤跌破就走、不攤平` : '無有效防守'}`);
+    L.push(`🛡 <b>防守</b>:${guardPx ? `最終防守 <b class="dxBig">${guardPx}</b>(${sg(-finalP)})${lockBinds ? `——🔒 ${lockWhy}` : ''},收盤跌破就走、不攤平` : d.brokeStop ? `已跌破 <b class="down">${fmt(stopS)}</b>——持有者照停損紀律處理,不把停損往下移` : '無有效防守'}`);
     if(advice.tp) L.push(`🎯 <b>停利</b>:${advice.tp}`);
     if(posSh >= 1 && stopOk){
       if(lockBinds) L.push(`📦 <b>部位</b>:${qtyTxt} 跌到鎖利線仍賺 <b class="up">+${$n(posSh * (finalStop - cost))}</b>——這筆已經不會賠,剩下的是賺多賺少`);
@@ -2547,7 +2590,7 @@ function calcPosRev(o){
     }
     html += `<br>你願意賠哪一種,部位就配哪一種防守——想少賠一點,${o.lots != null ? '就減張數再算一次' : '回上一頁用風險反推張數'}。`;
   }else{
-    html += `<br>目前無有效防守位(破底中)——<b>依紀律此處不進場</b>,這筆部位沒有可衡量的風險下限。`;
+    html += d.brokeStop ? `<br>⛔ 現價已跌破防守 <b>${fmt(stop)}</b>——買進依據失效,<b>依紀律此處不進場</b>;已持有者照停損紀律處理。` : `<br>目前無有效防守位(破底中)——<b>依紀律此處不進場</b>,這筆部位沒有可衡量的風險下限。`;
   }
   track('position_calc', {stock: d.id, mode: 'rev'});
   out.innerHTML = html + `<br><span style="opacity:.7;">非投資建議,計算僅供參考。</span>`;
@@ -2999,19 +3042,27 @@ async function renderComeback(){
     for(const id of pick){
       const sg = log[id], lv = lm[id];
       if(!sg || !lv || !(lv.p > 0)) continue;
-      const chg = (lv.p - sg.p) / sg.p * 100;
-      const broke = sg.s > 0 && lv.p < sg.s;
-      rows.push({id, nm: nmOf(id), chg, broke, tag: sg.t, d: sg.d, p: lv.p});
+      // 💰 除息還原:00918 這種月月/季季配的 ETF,除息當天價格就少一截,不是跌破防守——把「上次之後」配出去的現金加回來再比
+      let div = 0;
+      try{ if(sg.d < today0){ const dj = await fmData(`dataset=TaiwanStockDividendResult&data_id=${id}&start_date=${sg.d}&end_date=${today0}`);
+        for(const ev of (dj.data || [])) if(ev.date > sg.d && /息/.test(ev.stock_or_cache_dividend || '') && ev.stock_and_cache_dividend > 0) div += Number(ev.stock_and_cache_dividend); } }catch(e){}
+      const adj = lv.p + div;
+      const chg = (adj - sg.p) / sg.p * 100;
+      const broke = sg.s > 0 && adj < sg.s;
+      rows.push({id, nm: nmOf(id), chg, broke, tag: sg.t, d: sg.d, p: lv.p, div});
     }
     if(!rows.length) return;
     // 排序:跌破防守的最前(最需要知道),再按變化幅度
     rows.sort((a2, b2) => (b2.broke - a2.broke) || (Math.abs(b2.chg) - Math.abs(a2.chg)));
     const chip = r => {
       const c = r.chg >= 0 ? 'var(--red)' : 'var(--green)';
-      const guard = r.broke ? '<b style="color:var(--green);">跌破防守 ✗</b>' : (r.chg >= 5 ? '<b style="color:var(--red);">噴出 🔥</b>' : '守住 ✓');
+      // 判「不利/警戒」之後噴出=順勢框架沒接刀、錯過不是賠——要講清楚,不然看起來像工具報錯
+      const bad = /不利|警戒/.test(r.tag);
+      const guard = r.broke ? '<b style="color:var(--green);">跌破防守 ✗</b>' : (r.chg >= 5 ? (bad ? '<b style="color:var(--red);">噴出 🔥</b> <span style="opacity:.7; font-size:.78rem;">(當時不接刀,錯過不是賠)</span>' : '<b style="color:var(--red);">噴出 🔥</b>') : '守住 ✓');
+      const divTag = r.div > 0 ? ` <span style="opacity:.65; font-size:.75rem;">含息 ${r.div.toFixed(2)}</span>` : '';
       return `<button type="button" class="chip" style="display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; padding:8px 12px; margin:4px 6px 2px 0; line-height:1.45; text-align:left;" onclick="quickRun('${r.id} ${r.nm.replace(/[<>'\"]/g, '')}')">`
         + `<span><b>${r.nm}</b> <span style="opacity:.65; font-size:.78rem;">${r.d.slice(5).replace('-', '/')} 判「${r.tag}」</span></span>`
-        + `<span>之後 <b style="color:${c};">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(1)}%</b>|${guard}</span></button>`;
+        + `<span>之後 <b style="color:${c};">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(1)}%</b>${divTag}|${guard}</span></button>`;
     };
     const alert = rows.filter(r => r.broke).length;
     let card = $('comebackCard');
@@ -3356,10 +3407,13 @@ function taChecklist(s, instNet){
   // ④ 買點紀律:回後買上漲,不追突破長紅
   const nearMA = Math.min(...s.slice(-5).map(d => d.min)) <= ma20 * 1.015;
   const redUp = last.close > last.open && upDay;
+  // 「回後買上漲」只算一次,燈號與進場劇本共用——之前劇本少檢查「站上月線」,欣興 10/19 燈號未成立、劇本卻寫已成立
+  // 另加「離月線 5% 內」:台郡 10/19 五日噴 +29%、乖離 +24.6%,只因 5 天前的低點碰過月線就被判「回後買上漲成立」——那是追高,不是回後買
+  const buyOK = trend === '多頭' && above && nearMA && redUp && last.close < ma20 * 1.05;
   let bIcon, bTxt;
   if(trend === '空頭'){ bIcon = '❌'; bTxt = '空頭結構沒有「回後買上漲」——反彈走的是「彈後空下跌」的劇本'; }
   else if(trend === '轉多'){ bIcon = '⚠️'; bTxt = '轉多確認日通常已是長紅——順勢紀律不追突破當天,等回測頸線(前高)不破後的第一根上漲紅K再說'; }
-  else if(trend === '多頭' && above && nearMA && redUp){ bIcon = '✅'; bTxt = '近日回測月線不破+今日收紅上漲——「回後買上漲」樣態成立。<span style="color:var(--muted);">誠實註記:本工具實測(109 檔×3 年)此樣態報酬與一般日相當,它的價值在防守近、賠得少,不在漲得多</span>'; }
+  else if(buyOK){ bIcon = '✅'; bTxt = '近日回測月線不破+今日收紅上漲——「回後買上漲」樣態成立。<span style="color:var(--muted);">誠實註記:本工具實測(109 檔×3 年)此樣態報酬與一般日相當,它的價值在防守近、賠得少,不在漲得多</span>'; }
   else if(trend === '多頭' && last.close > ma20 * 1.08){ bIcon = '⚠️'; bTxt = `乖離月線已 ${((last.close / ma20 - 1) * 100).toFixed(1)}%,此刻進場屬於追高——順勢紀律是等回測支撐不破後的第一根上漲紅K`; }
   else { bIcon = '⚠️'; bTxt = '「回後買上漲」條件未成立——不追突破長紅,等回測支撐後的第一根上漲紅K'; }
   items.push({icon: bIcon, name: '買點紀律', txt: bTxt});
@@ -3431,13 +3485,17 @@ function taChecklist(s, instNet){
   let amp10 = 0;
   { let a2 = 0, k3 = 0; for(let j3 = Math.max(1, n - 10); j3 < n; j3++){ if(s[j3].close > 0){ a2 += (s[j3].max - s[j3].min) / s[j3].close; k3++; } } if(k3) amp10 = a2 / k3 * 100; }
   const distPct = (last.close > 0 && lastLow > 0) ? (last.close - lastLow) / last.close * 100 : 0;
+  // ⛔ 已跌破防守:防守價在現價之上(南亞科 497 vs 432.75)——不能再當「多方防守位」推薦,也不能拿負數距離去跟振幅比
+  const brokeStop = farNote !== 'BREAK' && lastLow > 0 && last.close < lastLow;
   let altStop = 0, ampNote = '';
-  if(farNote !== 'BREAK' && lastLow > 0 && amp10 > 0 && distPct < amp10 * 0.8){
+  if(!brokeStop && farNote !== 'BREAK' && lastLow > 0 && amp10 > 0 && distPct > 0 && distPct < amp10 * 0.8){
     const lower = [trailLow, ma20, lastLowC].filter(x2 => x2 > 0 && x2 < lastLow * 0.999).sort((a3, b3) => b3 - a3);
     altStop = lower.find(x2 => (last.close - x2) / last.close * 100 >= amp10 * 0.8) || (lower.length ? lower[lower.length - 1] : 0);
     ampNote = `;🌊 <b>注意:防守距現價僅 ${distPct.toFixed(1)}%,小於近10日平均日振幅 ${amp10.toFixed(1)}%</b>——盤中正常晃動就可能掃到,這個距離只適合當沖的緊出場;<b>波段操作請退一層</b>${altStop ? `用 <b>${fmt(altStop)}</b>(距 ${((last.close - altStop) / last.close * 100).toFixed(1)}%)當防守,部位跟著縮` : ',或等拉回更貼近支撐再進場'}`;
   }
-  const stop = farNote === 'BREAK'
+  const stop = brokeStop
+    ? `⚠️ <b>現價 ${fmt(last.close)} 已跌破防守 ${fmt(lastLow)}</b>(-${((lastLow - last.close) / lastLow * 100).toFixed(1)}%)——買進依據已失效:<b>持有者照停損紀律處理</b>(不攤平、不把停損往下移);未持有者等<b>收復 ${fmt(lastLow)}</b> 或出現新的底再評估`
+    : farNote === 'BREAK'
     ? `⚠️ <b>現價 ${fmt(last.close)} 已跌破近期所有低點</b>(近10日低、微回檔底都在現價之上)——正在破底,近距離沒有任何支撐;下一個結構支撐遠在 <b>${fmt(lastLow)}</b>(約 -${((last.close - lastLow) / last.close * 100).toFixed(0)}%)。這種位置做多形同沒有防守——順勢規則的答案:空手不進場,持有者依自己的停損紀律處理,不凹單`
     : trailing
     ? `${farNote ? '實務' : '多頭移動'}防守=前一個回檔底/月線之較高者 ${fmt(lastLow)}(月線 ${fmt(ma20)})——${farNote ? farNote.slice(1) : '趨勢延伸,防守跟著墊高'};跌破就出場或大減碼,停利可以提早、停損不能商量${shortNote}`
@@ -3472,7 +3530,10 @@ function taChecklist(s, instNet){
   }else if(trend === '轉多'){
     entry = `轉多確認日通常已是長紅,順勢紀律<b>不追突破當天</b>——劇本:<b>回測頸線 ${fmt(neck)} 不破,出現第一根上漲紅K</b>(收盤>開盤且>昨收)才是規則裡的進場條件;跌回頸線之下=突破失敗,劇本作廢`;
   }else if(trend === '多頭'){
-    if(nearMA && redUp) entry = `<b>「回後買上漲」條件今日已成立</b>——順勢框架的標準進場樣態就長這樣:防守 ${fmt(lastLow)} 就在腳邊,部位用下方計算器算,跌破就走、不攤平`;
+    if(buyOK) entry = `<b>「回後買上漲」條件今日已成立</b>——順勢框架的標準進場樣態就長這樣:防守 ${fmt(lastLow)} 就在腳邊,部位用下方計算器算,跌破就走、不攤平`;
+    else if(!above) entry = `頭底結構仍是多頭,但<b>收盤已跌破月線 ${fmt(ma20)}</b>(${dMa.toFixed(1)}%)——短線轉弱。劇本:①<b>收盤站回月線且月線維持上彎</b>=回檔結束;②`
+      + (brokeStop ? `前波低點 ${fmt(lastLow)} 也已跌破,結構待重建——等<b>新的底</b>(變盤線+次日開高)出現才是第二隻腳候選` : `在前波低點 <b>${fmt(lastLow)}</b> 附近出現變盤線+次日開高=第二隻腳候選`)
+      + `。兩者都沒出現前,這是回檔中,不是「回後買上漲」`;
     else if(dMa >= 5) entry = `現價乖離月線已 <b>+${dMa.toFixed(1)}%</b>,此刻進場=追高——劇本A <b>拉回接</b>:回測月線 ${fmt(ma20)} 附近止跌收紅再核對;劇本B <b>動能續航</b>:收盤帶量(≥1.3×均量)創近 40 日新高${nh40 ? '(<b>今日已觸發 🚀</b>)' : ''}視為趨勢延續。兩個條件都沒出現就等——<b>錯過不是錯,追高被洗才是</b>`;
     else entry = `多頭延伸、乖離不大——兩個標準觸發條件:①<b>拉回月線 ${fmt(ma20)} 附近不破+收紅上漲</b>(回後買上漲);②<b>收盤帶量創近 40 日新高</b>(🚀 動能訊號,本工具實測樣態)。沒觸發就觀察,順勢者不需要天天出手`;
   }else if(phase === '打底'){
@@ -3482,7 +3543,7 @@ function taChecklist(s, instNet){
   }else{
     entry = `盤整區間,順勢者的劇本:<b>收盤帶量突破前波頭 ${fmt(neck)}</b>(距現價 ${last.close < neck ? '+' + ((neck - last.close) / last.close * 100).toFixed(1) + '%' : '門口'})才有進場理由;區間裡殺進殺出,多數時候是幫券商打工`;
   }
-  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', nh40, amp10, altStop};
+  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop};
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
@@ -3608,7 +3669,7 @@ function drawKChart(canvas, bars, ck){
   g.setLineDash([]);
   let defY = Math.min(pBot - 6, Math.max(10, y(ck.lastLow)));
   for(const gy of gridYs){ if(Math.abs(defY - gy) < 12){ defY = gy + 13; break; } }   // 跟刻度太近就往下錯開
-  g.fillStyle = ACC; g.fillText('防守 ' + fmt(ck.lastLow), W - padR + 6, Math.min(pBot - 6, defY));
+  g.fillStyle = ck.brokeStop ? '#f85149' : ACC; g.fillText((ck.brokeStop ? '已破 ' : '防守 ') + fmt(ck.lastLow), W - padR + 6, Math.min(pBot - 6, defY));
   // 頭/底轉折圈
   for(const m of ck.marks){
     const li = m.i - (ck.total - n);
@@ -3930,7 +3991,7 @@ async function renderAiInsight(stockId, name){
       const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
       window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, p: lastC, price: fmt(lastC),
         pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
-        stop: ckObj.lastLow, amp: ckObj.amp10, altStop: ckObj.altStop, nh40: !!ckObj.nh40, score: ckObj.score, nItems: ckObj.nItems} : null;
+        stop: ckObj.lastLow, brokeStop: !!ckObj.brokeStop, amp: ckObj.amp10, altStop: ckObj.altStop, nh40: !!ckObj.nh40, score: ckObj.score, nItems: ckObj.nItems} : null;
     }catch(e){ window.__cardD = null; }
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
@@ -3948,7 +4009,9 @@ async function renderAiInsight(stockId, name){
         : ckObj.verdict.includes('作頭') ? '<b class="down">警戒 🟠</b>'
         : '<b style="color:var(--gold);">中性 🟡</b>';
       pills += `<span class="pill">短線環境 ${light}</span>`;
-      pills += ckObj.breakdown
+      pills += ckObj.brokeStop
+        ? `<span class="pill">⛔ <b class="down">已跌破防守 ${fmt(ckObj.lastLow)}</b></span>`
+        : ckObj.breakdown
         ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>`
         : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ckObj.lastLow)}</b></span>`;
       if(ckObj.nh40) pills += `<span class="pill" style="border-color:var(--red);">🚀 <b class="up">創新高帶量</b></span>`;
