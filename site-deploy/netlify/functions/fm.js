@@ -3,7 +3,7 @@
 exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   const allowed = ['dataset', 'data_id', 'start_date', 'end_date'];
-  const okDatasets = ['TaiwanStockPrice', 'TaiwanStockInfo', 'TaiwanStockSplitPrice', 'TaiwanStockDividendResult', 'TaiwanStockInstitutionalInvestorsBuySell', 'TaiwanStockNews', 'TaiwanStockFinancialStatements'];
+  const okDatasets = ['TaiwanStockPrice', 'TaiwanStockInfo', 'TaiwanStockSplitPrice', 'TaiwanStockDividendResult', 'TaiwanStockInstitutionalInvestorsBuySell', 'TaiwanStockNews', 'TaiwanStockFinancialStatements', 'TaiwanStockPER'];
   const p = new URLSearchParams();
   for(const k of allowed) if(q[k]) p.set(k, String(q[k]).slice(0, 40));
   if(!okDatasets.includes(p.get('dataset') || '') || !p.get('data_id')){
