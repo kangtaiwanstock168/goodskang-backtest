@@ -430,7 +430,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-H';
+const APP_VER = 'v20261024-I';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -757,7 +757,8 @@ function updateDcaHint(){
     renderWatchBoard(); renderRadar(); renderTopic(); renderComeback(); };
   if(fromShare || IN_APP){
     setTimeout(bgLoad, fromShare ? 6000 : 2500);
-    window.addEventListener('scroll', function f1(){ if(window.scrollY > 300){ window.removeEventListener('scroll', f1); bgLoad(); } }, {passive: true});
+    // 只認「使用者自己動手」(觸控/滾輪/鍵盤)——結果區自動捲動不算
+    ['touchmove', 'wheel', 'keydown'].forEach(ev => window.addEventListener(ev, bgLoad, {passive: true, once: true}));
   } else bgLoad();
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
   // 首次進站與「持倉或買入計算」模式不自動示範(省一輪載入,雷達先出來);看一檔/存股模式的回訪者才自動跑
