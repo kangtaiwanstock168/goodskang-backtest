@@ -16,17 +16,17 @@
 # SEO:個股/ETF 伺服器渲染頁、索引頁、網站地圖(function 產生,CDN 快取)
 [[redirects]]
   from = "/stock/"
-  to = "/.netlify/functions/page?hub=1"
+  to = "/.netlify/functions/page/hub"
   status = 200
 [[redirects]]
   from = "/stock"
-  to = "/.netlify/functions/page?hub=1"
+  to = "/.netlify/functions/page/hub"
   status = 200
 [[redirects]]
   from = "/stock/:id"
-  to = "/.netlify/functions/page?id=:id"
+  to = "/.netlify/functions/page/:id"
   status = 200
 [[redirects]]
   from = "/sitemap.xml"
-  to = "/.netlify/functions/page?sitemap=1"
+  to = "/.netlify/functions/page/sitemap"
   status = 200
