@@ -82,8 +82,10 @@ exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   let list = LIST;
   if(q.id){ const id = String(q.id).toUpperCase().trim(); if(!/^\d{4,6}[A-Z]?$/.test(id)) return {statusCode: 400, body: '{"err":"bad id"}'}; list = [[id, '自選']]; }
+  // ids=a,b,c(最多 6 檔):熱門榜動態清單用,分類由前端依名稱判斷
+  if(q.ids){ const ids = String(q.ids).toUpperCase().split(',').map(s => s.trim()).filter(s => /^\d{4,6}[A-Z]?$/.test(s)).slice(0, 6); if(!ids.length) return {statusCode: 400, body: '{"err":"bad ids"}'}; list = ids.map(id => [id, '']); }
   // 分組:g=0/1/2 各算 5 檔(前端三組平行抓)——單次函式控制在 10 秒內,各組各自快取
-  if(!q.id && q.g != null){ const g = Math.max(0, Math.min(2, parseInt(q.g) || 0)); list = LIST.slice(g * 5, g * 5 + 5); }
+  if(!q.id && !q.ids && q.g != null){ const g = Math.max(0, Math.min(2, parseInt(q.g) || 0)); list = LIST.slice(g * 5, g * 5 + 5); }
   const out = await Promise.all(list.map(([id, cat]) => calcOne(id, cat).catch(e => ({id, cat, err: String(e)}))));
   const ok = out.filter(x => !x.err).length;
   return {statusCode: 200,
