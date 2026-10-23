@@ -423,7 +423,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-B';
+const APP_VER = 'v20261024-C';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -3587,14 +3587,25 @@ function taChecklist(s, instNet){
   let sig = null;
   try{
     const px = last.close, broke = brokeStop || farNote === 'BREAK';
-    const stopP = broke ? 0 : (altStop > 0 ? altStop : lastLow);
+    // 台股升降單位:價位一律對齊實際可掛單的 tick(停損往下取、停利往下取)
+    const tick = p => p < 10 ? 0.01 : p < 50 ? 0.05 : p < 100 ? 0.1 : p < 500 ? 0.5 : p < 1000 ? 1 : 5;
+    const tDn = p => { const k = tick(p); return Math.floor(p / k + 1e-9) * k; };
+    // 停損距離至少要 ≥ 近 10 日平均日振幅(最少 2%):太近的防守一個正常盤中晃動就掃掉,報酬風險比也會被灌水
+    const minD = Math.max(2, amp10 || 0) / 100;
+    let stopP = broke ? 0 : (altStop > 0 ? altStop : lastLow), stopWhy = '收盤跌破即出場';
+    if(stopP > 0 && (px - stopP) / px < minD){
+      const lower = [trailLow, ma20, lastLowC, ...LsC.map(p => p.p)].filter(v => v > 0 && v < px * (1 - minD)).sort((a3, b3) => b3 - a3);
+      if(lower.length && (px - lower[0]) / px <= 0.12){ stopP = lower[0]; stopWhy = '近端防守太貼現價,退到下一個支撐'; }
+      else { stopP = px * (1 - minD * 1.5); stopWhy = `近端防守太貼現價,改用波動停損(1.5×平均日振幅 ${(amp10 || 0).toFixed(1)}%)`; }
+    }
+    if(stopP > 0) stopP = tDn(stopP);
     const risk = stopP > 0 ? px - stopP : 0;
     // 停利參考①:現價之上最近的波段高點(上檔第一個套牢區);沒有就看近 120 日最高;再沒有(創新高)用 1:2 風險報酬推算
-    const hAbove = pvAll.filter(p => p.t === 'H' && p.p > px * 1.01).map(p => p.p);
+    const hAbove = pvAll.filter(p => p.t === 'H' && p.p > px * (1 + minD)).map(p => p.p);
     const hi120 = Math.max(...s.slice(Math.max(0, n - 120), n - 1).map(b => b.max));
     let tp1 = 0, tp1Why = '';
     if(hAbove.length){ tp1 = Math.min(...hAbove); tp1Why = '上方最近的波段高點(前波套牢區)'; }
-    else if(hi120 > px * 1.01){ tp1 = hi120; tp1Why = '近半年最高價'; }
+    else if(hi120 > px * (1 + minD)){ tp1 = hi120; tp1Why = '近半年最高價'; }
     else if(risk > 0){ tp1 = px + risk * 2; tp1Why = '上方無前高,以「風險 ×2」推算'; }
     // 停利參考②:等幅測距——前一段上漲波的幅度,從最近的底往上量
     let tp2 = 0, tp2Why = '';
@@ -3607,7 +3618,8 @@ function taChecklist(s, instNet){
       }
       if(!tp2 && risk > 0 && tp1 > 0){ const r3 = px + risk * 3; if(r3 > tp1 * 1.02){ tp2 = r3; tp2Why = '以「風險 ×3」推算'; } }
     }
-    const lo = Math.max(stopP * 1.005, Math.min(px, ma20));
+    tp1 = tp1 > 0 ? tDn(tp1) : 0; tp2 = tp2 > 0 ? tDn(tp2) : 0;
+    const lo = tDn(Math.max(stopP * 1.005, Math.min(px, ma20)));
     let tag, cls2, act, zone = '', zoneWhy = '', holdAct;
     if(broke){
       tag = '🔴 停損訊號'; cls2 = 'r';
@@ -3622,20 +3634,20 @@ function taChecklist(s, instNet){
     }else if((buyOK || verdict.includes('友善') || verdict.includes('買點浮現')) && dMa < 5 && risk > 0){
       tag = '🟢 可進場區'; cls2 = 'g';
       act = buyOK ? '「回後買上漲」樣態成立,防守就在附近' : '趨勢與燈號條件多數成立';
-      zone = `${fmt(lo)} – ${fmt(px)}`; zoneWhy = '月線(或防守)到現價之間';
+      zone = `${fmt(tDn(lo))} – ${fmt(tDn(px))}`; zoneWhy = '月線(或防守)到現價之間';
       holdAct = `持有者:續抱,停損 ${fmt(stopP)}${tp1 ? `、到 ${fmt(tp1)} 附近可分批停利` : ''}`;
     }else{
       tag = '🟡 觀望・等條件'; cls2 = 'y';
-      if(trend === '多頭' && dMa >= 5){ act = `乖離月線 +${dMa.toFixed(1)}%,現價進場等於追高`; zone = `${fmt(ma20)} – ${fmt(ma20 * 1.02)}`; zoneWhy = '拉回月線附近止跌收紅'; }
+      if(trend === '多頭' && dMa >= 5){ act = `乖離月線 +${dMa.toFixed(1)}%,現價進場等於追高`; zone = `${fmt(tDn(ma20))} – ${fmt(tDn(ma20 * 1.02))}`; zoneWhy = '拉回月線附近止跌收紅'; }
       else if(trend === '多頭' && !above){ act = '多頭結構但收盤跌破月線,回檔中'; zoneWhy = `收盤站回月線 ${fmt(ma20)} 才轉為可進場`; }
-      else if(trend === '轉多'){ act = '剛突破頸線,突破當天不追'; zone = `${fmt(neck)} – ${fmt(neck * 1.02)}`; zoneWhy = '回測頸線不破、收紅上漲'; }
-      else if(trend === '多頭'){ act = '多頭延伸,但買點條件未齊'; zone = `${fmt(ma20)} – ${fmt(Math.min(px, ma20 * 1.02))}`; zoneWhy = '拉回月線不破+收紅'; }
+      else if(trend === '轉多'){ act = '剛突破頸線,突破當天不追'; zone = `${fmt(tDn(neck))} – ${fmt(tDn(neck * 1.02))}`; zoneWhy = '回測頸線不破、收紅上漲'; }
+      else if(trend === '多頭'){ act = '多頭延伸,但買點條件未齊'; zone = `${fmt(tDn(ma20))} – ${fmt(tDn(Math.min(px, ma20 * 1.02)))}`; zoneWhy = '拉回月線不破+收紅'; }
       else { act = phase === '打底' ? '打底轉強中,還沒過頸線' : '盤整區間,方向未定'; zoneWhy = `收盤帶量站上 ${fmt(neck)}(${neck > px ? '+' + ((neck - px) / px * 100).toFixed(1) + '%' : '門口'})才轉為可進場`; }
       holdAct = `持有者:續抱,跌破 ${fmt(stopP)} 出場${tp1 ? `;到 ${fmt(tp1)} 附近可分批停利` : ''}`;
     }
     if(!broke && dMa >= 15) holdAct = `持有者:乖離月線 +${dMa.toFixed(1)}% 偏熱,可先分批停利;停損上移到 ${fmt(stopP)}`;
     const rr = (risk > 0 && tp1 > px) ? (tp1 - px) / risk : 0;
-    sig = {tag, cls: cls2, act, zone, zoneWhy, holdAct, stop: stopP, stopPct: stopP > 0 ? (stopP - px) / px * 100 : 0,
+    sig = {tag, cls: cls2, act, zone, zoneWhy, holdAct, stopWhy, stop: stopP, stopPct: stopP > 0 ? (stopP - px) / px * 100 : 0,
       tp1: broke ? 0 : tp1, tp1Why, tp1Pct: tp1 > 0 ? (tp1 - px) / px * 100 : 0, tp2: broke ? 0 : tp2, tp2Why, tp2Pct: tp2 > 0 ? (tp2 - px) / px * 100 : 0, rr, px};
   }catch(e){ sig = null; }
   return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
@@ -3647,7 +3659,7 @@ function sigCardHtml(g){
   const row = (k, v, why, col) => `<div class="sgr"><span class="sgk">${k}</span><span class="sgv"${col ? ` style="color:${col};"` : ''}>${v}</span><span class="sgw">${why}</span></div>`;
   let h = `<div class="sgc ${g.cls}"><div class="sgh"><b class="sgt">${g.tag}</b><span class="sga">${g.act}</span></div>`;
   h += row('進場參考', g.zone ? `<b>${g.zone}</b>` : '<b>暫不進場</b>', g.zoneWhy);
-  if(g.stop > 0) h += row('停損參考', `<b>${fmt(g.stop)}</b> ${pc(g.stopPct)}`, '收盤跌破即出場', 'var(--green)');
+  if(g.stop > 0) h += row('停損參考', `<b>${fmt(g.stop)}</b> ${pc(g.stopPct)}`, g.stopWhy || '收盤跌破即出場', 'var(--green)');
   if(g.tp1 > 0) h += row('停利參考①', `<b>${fmt(g.tp1)}</b> ${pc(g.tp1Pct)}`, g.tp1Why, 'var(--red)');
   if(g.tp2 > 0) h += row('停利參考②', `<b>${fmt(g.tp2)}</b> ${pc(g.tp2Pct)}`, g.tp2Why, 'var(--red)');
   if(g.rr > 0) h += row('報酬風險比', `<b>${g.rr.toFixed(1)} : 1</b>`, g.rr >= 2 ? '賺賠比合格(≥2)' : g.rr >= 1 ? '賺賠比普通,部位縮小' : '賺的空間小於賠的空間');
