@@ -392,9 +392,10 @@ function taChecklist(s, instNet){
     sig = {tag, cls: cls2, act, zone, zoneWhy, holdAct, stopWhy, stop: stopP, stopPct: stopP > 0 ? (stopP - px) / px * 100 : 0,
       tp1: broke ? 0 : tp1, tp1Why, tp1Pct: tp1 > 0 ? (tp1 - px) / px * 100 : 0, tp2: broke ? 0 : tp2, tp2Why, tp2Pct: tp2 > 0 ? (tp2 - px) / px * 100 : 0, rr, px};
   }catch(e){ sig = null; }
-  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
+  // 對外顯示的防守價統一用訊號卡的停損參考(已做最小距離與升降單位調整),避免膠囊/K 線/計畫卡出現兩個不同的防守數字
+  const stopUse = (sig && sig.stop > 0) ? sig.stop : lastLow;
+  return {stopUse, items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
 }
-
 async function analyze(id){
   const now = new Date(), end = ymd(now);
   const st = new Date(now); st.setDate(st.getDate() - 160); const startL = ymd(st);
