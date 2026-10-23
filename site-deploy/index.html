@@ -281,7 +281,7 @@
       <button type="button" class="chip" onclick="quickRun('2327 國巨')">國巨</button>
     </p>
     <p id="watchRow" style="display:none; margin-top:8px; font-size:.85rem; color:var(--muted);"></p>
-    <p style="margin:16px 0 10px; padding-top:12px; border-top:1px dashed var(--border); font-size:.9rem; color:var(--gold); font-weight:700;">🐢 想做波段/長期存股回測?往下自訂日期與資金計畫(不改也行,全有預設值):</p>
+    <details id="btWrap"><summary style="margin:16px 0 10px; padding-top:12px; border-top:1px dashed var(--border); font-size:.9rem; color:var(--gold); font-weight:700; cursor:pointer;">🐢 想做波段/長期存股回測?往下自訂日期與資金計畫(不改也行,全有預設值):</summary>
     <div class="form-grid">
       <div><label>買入日期</label><div class="combo"><input type="text" id="buyDate" readonly placeholder="選擇日期"><span class="cal-ico">📅</span><div class="dp" id="dp-buyDate"></div></div></div>
       <div><label>賣出日期</label><div class="combo"><input type="text" id="sellDate" readonly placeholder="選擇日期"><span class="cal-ico">📅</span><div class="dp" id="dp-sellDate"></div></div></div>
@@ -311,6 +311,7 @@
       <input type="checkbox" id="fee" checked>
       <label for="fee" style="margin:0;">計入交易成本(手續費 0.1425% + 賣出證交稅 0.3%)</label>
     </div>
+    </details>
   </div>
 
   <div id="status"></div>
@@ -430,7 +431,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-I';
+const APP_VER = 'v20261024-J';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -1970,6 +1971,14 @@ function curMode(){ const m = localStorage.getItem('mode'); return (m === 'hold'
 // 🚦 雷達卡訊號徽章:每張熱門卡背景跑一次訊號卡(同時最多 2 檔、同一檔同一天只算一次)——想進場的人不用一張張點
 window.__sigCache = window.__sigCache || {};
 let __sigQ = [], __sigRun = 0;
+// 熱門快選按鈕也掛上訊號燈(沿用雷達算好的結果,不另外抓資料)
+function colorChips(){
+  document.querySelectorAll('#quickChips button.chip').forEach(b => {
+    const m = (b.getAttribute('onclick') || '').match(/'(\w+)/); if(!m) return;
+    const g = window.__sigCache[m[1]]; if(!g || b.dataset.sg) return;
+    b.dataset.sg = '1'; b.textContent = (g.cls === 'g' ? '🟢 ' : g.cls === 'y' ? '🟡 ' : g.cls === 'o' ? '🟠 ' : '🔴 ') + b.textContent;
+  });
+}
 function fillSigBadges(box){
   if(!box) return;
   // 卡片捲到畫面附近才算(省 API 額度與手機流量);不支援 IntersectionObserver 就直接全算
@@ -1993,6 +2002,7 @@ function fillSigBadges(box){
             b.innerHTML = `<b>${g.tag}</b><span>${kv}</span>`; b.className = 'sigb ' + g.cls;
           }
         }
+        try{ colorChips(); }catch(e){}
         __sigRun--; pump();
       })();
     }
@@ -2027,6 +2037,7 @@ function applyModeOrder(){
   if(mode === 'one'){ cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb); if(cb) cont.insertBefore(cb, wb); }
   else { if(cb) cont.insertBefore(cb, wb); cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb); }
   const dw = $('deepWrap'); if(dw) dw.open = (mode === 'long');
+  const bw = $('btWrap'); if(bw) bw.open = (mode === 'long');
 }
 function setMode(m){
   try{ localStorage.setItem('mode', m); }catch(e){}
@@ -2055,7 +2066,7 @@ function renderHotChips(hot){
   const qc = $('quickChips');
   if(qc){
     const dyn = list.slice(2, 10);   // 0050、正2 固定在前,其餘跟著雷達走
-    qc.innerHTML = '🔥 熱門快選(點了直接分析):' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join('');
+    qc.innerHTML = '🔥 熱門快選(點了直接分析):' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join(''); try{ colorChips(); }catch(e){}
   }
 }
 function hPick(v){ const hs = $('hStock'); if(!hs) return; hs.value = v; $('suggest3').style.display = 'none'; $('hCost').focus(); }
@@ -3657,7 +3668,16 @@ function taChecklist(s, instNet){
     const tDn = p => { const k = tick(p); return Math.floor(p / k + 1e-9) * k; };
     // 停損距離至少要 ≥ 近 10 日平均日振幅(最少 2%):太近的防守一個正常盤中晃動就掃掉,報酬風險比也會被灌水
     const minD = Math.max(2, amp10 || 0) / 100;
+    // 追高門檻跟著股性走:日振幅大的股票,離月線 8% 是日常,不該一律用 5% 判追高(上限 10%)
+    const chaseT = Math.min(10, Math.max(5, (amp10 || 0) * 2));
+    // 🚀 動能突破:多頭/轉多+帶量創近 40 日新高+至少 3 燈——檢查表「劇本B 動能續航」成立,乖離大也算進場訊號(防守改用突破K低點/頸線)
+    const momo = !broke && (trend === '多頭' || trend === '轉多') && nh40 && score >= 3 && dMa < 25;
     let stopP = broke ? 0 : (altStop > 0 ? altStop : lastLow), stopWhy = '收盤跌破即出場';
+    if(momo){
+      const cs = [last.min, neck, trailLow, ma20].filter(v => v > 0 && v < px * (1 - minD));
+      stopP = cs.length ? Math.max(...cs) : px * (1 - minD * 1.5);
+      stopWhy = '突破K低點/頸線/月線中最近的一個,跌破=突破失敗';
+    }
     if(stopP > 0 && (px - stopP) / px < minD){
       const lower = [trailLow, ma20, lastLowC, ...LsC.map(p => p.p)].filter(v => v > 0 && v < px * (1 - minD)).sort((a3, b3) => b3 - a3);
       if(lower.length && (px - lower[0]) / px <= 0.12){ stopP = lower[0]; stopWhy = '近端防守太貼現價,退到下一個支撐'; }
@@ -3696,14 +3716,19 @@ function taChecklist(s, instNet){
       act = trend === '空頭' ? '頭頭低、底底低的空頭結構,做多不在順勢框架內' : '頭頭低的作頭結構,反彈先看壓力';
       zoneWhy = `收盤站回月線 ${fmt(ma20)} 且月線上彎才轉為可進場`;
       holdAct = `持有者:反彈到月線 ${fmt(ma20)} 附近是減碼參考;跌破 ${fmt(stopP)} 出場`;
-    }else if((buyOK || verdict.includes('友善') || verdict.includes('買點浮現')) && dMa < 5 && risk > 0){
+    }else if(momo && risk > 0){
+      tag = '🟢 突破進場(動能)'; cls2 = 'g';
+      act = `帶量創近 40 日新高(${score}/${nItems} 綠燈)——動能型進場;乖離月線 +${dMa.toFixed(1)}%,部位減半`;
+      zone = `${fmt(tDn(px * 0.98))} – ${fmt(tDn(px))}`; zoneWhy = '收盤價附近;隔天開高超過 3% 不追';
+      holdAct = `持有者:續抱,停損上移到 ${fmt(stopP)}`;
+    }else if((buyOK || verdict.includes('友善') || verdict.includes('買點浮現')) && dMa < chaseT && risk > 0){
       tag = '🟢 可進場區'; cls2 = 'g';
       act = buyOK ? '「回後買上漲」樣態成立,防守就在附近' : '趨勢與燈號條件多數成立';
       zone = `${fmt(tDn(lo))} – ${fmt(tDn(px))}`; zoneWhy = '月線(或防守)到現價之間';
       holdAct = `持有者:續抱,停損 ${fmt(stopP)}${tp1 ? `、到 ${fmt(tp1)} 附近可分批停利` : ''}`;
     }else{
       tag = '🟡 觀望・等條件'; cls2 = 'y';
-      if(trend === '多頭' && dMa >= 5){ act = `乖離月線 +${dMa.toFixed(1)}%,現價進場等於追高`; zone = `${fmt(tDn(ma20))} – ${fmt(tDn(ma20 * 1.02))}`; zoneWhy = '拉回月線附近止跌收紅'; }
+      if(trend === '多頭' && dMa >= chaseT){ act = `乖離月線 +${dMa.toFixed(1)}%,現價進場等於追高`; zone = `${fmt(tDn(ma20))} – ${fmt(tDn(ma20 * 1.02))}`; zoneWhy = '拉回月線附近止跌收紅'; }
       else if(trend === '多頭' && !above){ act = '多頭結構但收盤跌破月線,回檔中'; zoneWhy = `收盤站回月線 ${fmt(ma20)} 才轉為可進場`; }
       else if(trend === '轉多'){ act = '剛突破頸線,突破當天不追'; zone = `${fmt(tDn(neck))} – ${fmt(tDn(neck * 1.02))}`; zoneWhy = '回測頸線不破、收紅上漲'; }
       else if(trend === '多頭'){ act = '多頭延伸,但買點條件未齊'; zone = `${fmt(tDn(ma20))} – ${fmt(tDn(Math.min(px, ma20 * 1.02)))}`; zoneWhy = '拉回月線不破+收紅'; }
