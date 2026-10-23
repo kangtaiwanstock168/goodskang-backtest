@@ -427,7 +427,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-E';
+const APP_VER = 'v20261024-F';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1988,6 +1988,15 @@ function fillSigBadges(box){
   };
   pump();
 }
+// 📊 點擊來源追蹤:radar/topic 只記「有顯示」,不知道有沒有人點——這裡補記「從哪裡點進分析」與當下訊號
+document.addEventListener('click', e => {
+  try{
+    const card = e.target.closest('.stat.tap[data-sid]');
+    if(card){ const box = card.closest('.card'); const g = window.__sigCache[card.dataset.sid]; track('pick', {src: box ? box.id.replace('Card', '') : 'card', stock: card.dataset.sid, sig: g ? g.cls : ''}); return; }
+    const chip = e.target.closest('button.chip');
+    if(chip){ const p = chip.parentNode; track('pick', {src: p && p.id === 'hChips' ? 'hold_chip' : 'quick_chip', stock: (chip.getAttribute('onclick') || '').replace(/^\D*(\w+).*$/, '$1')}); }
+  }catch(err){}
+}, true);
 function applyModeOrder(){
   const mode = curMode();
   document.querySelectorAll('.modeBtn').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
