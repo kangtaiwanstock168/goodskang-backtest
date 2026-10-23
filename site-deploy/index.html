@@ -188,6 +188,24 @@
   .sgm{margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px; font-size:.92rem; font-weight:700;}
   .sgm input{width:96px; padding:7px 9px; margin:0 4px; border-radius:8px; border:1px solid var(--accent); background:var(--bg); color:var(--text); font-size:1rem;}
   .sgmr{display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:8px; font-weight:400;}
+  .etfBar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin:6px 0 8px;}
+  .etfTabs button{padding:6px 12px; margin:2px 4px 2px 0; border-radius:999px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; font-size:.88rem;}
+  .etfTabs button.on{border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,.12); font-weight:700;}
+  #etfSort{padding:6px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);}
+  .etfAdd{font-size:.85rem; color:var(--muted); margin-bottom:10px;} .etfAdd input{width:110px; padding:6px 8px; margin:0 6px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);}
+  .etfAdd button{padding:6px 12px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); cursor:pointer;}
+  .etfT{width:100%; border-collapse:collapse; font-size:.9rem;} .etfT th{color:var(--muted); font-weight:400; font-size:.78rem; text-align:right; padding:6px 6px; border-bottom:1px solid var(--border); white-space:nowrap;}
+  .etfT td{padding:9px 6px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;} .etfT td:first-child,.etfT th:first-child{text-align:left;}
+  .etfT tr.r:hover{background:rgba(88,166,255,.05);} .etfT .nm b{font-size:.98rem;} .etfT .nm span{display:block; color:var(--muted); font-size:.74rem;}
+  .etfT .sg{font-size:.78rem; font-weight:700;} .etfT .go{padding:5px 10px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.1); color:var(--accent); cursor:pointer; font-size:.8rem;}
+  .etfT .sub{color:var(--muted); font-size:.72rem;}
+  @media(max-width:760px){
+    .etfT thead{display:none;} .etfT, .etfT tbody, .etfT tr, .etfT td{display:block; width:100%;}
+    .etfT tr.r{border:1px solid var(--border); border-radius:10px; padding:8px 10px; margin-bottom:10px;}
+    .etfT td{border:0; padding:3px 0; text-align:left; white-space:normal; display:flex; justify-content:space-between; gap:8px;}
+    .etfT td::before{content:attr(data-k); color:var(--muted); font-size:.8rem;} .etfT td.nm::before,.etfT td.gocell::before{content:'';}
+    .etfT td.nm{display:block;} .etfT td.gocell{justify-content:flex-end;}
+  }
   .mkt{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:12px auto 0; max-width:760px;}
   .mkt .m{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(88,166,255,.05); font-size:.88rem;}
   .mkt .m b{font-weight:800;} .mkt .m .k{color:var(--muted); font-size:.8rem;}
@@ -264,6 +282,21 @@
     <h2 class="section">📰 更多話題股——完整新聞熱度榜</h2>
     <p class="subtitle" style="margin-top:-6px;"><b style="color:var(--accent);">👇 每張卡片都能點,直接看該檔的完整分析</b></p><div class="stats" id="topic2Box"></div>
     <p class="hint" id="topic2Hint" style="margin-top:8px;">接續頁面最上方的話題雷達,合計列出新聞熱度前 15 名。</p>
+  </div>
+
+  <div class="card" id="etfCard" style="display:none;">
+    <h2 class="section" style="margin-top:0;">🐢 存股 ETF 專區——含息報酬、最慘跌多少、配息一次看</h2>
+    <p class="subtitle" style="margin-top:-4px;">存股比的不是殖利率,是<b style="color:var(--gold);">「含息總報酬」</b>(股價漲跌+配息再投入)——殖利率高、股價一直跌,一樣是賠。下面每一檔都用同一把尺量:近 1 年、近 3 年、3 年內最慘跌多少、現在離高點多遠、每月存 1 萬存 3 年變多少。</p>
+    <div class="etfBar">
+      <div class="etfTabs" id="etfTabs"></div>
+      <select id="etfSort" onchange="renderEtf()">
+        <option value="r3a">排序:近 3 年年化(含息)</option><option value="r1">排序:近 1 年(含息)</option>
+        <option value="yld">排序:殖利率</option><option value="mdd3">排序:最大回檔(小→大)</option><option value="dd">排序:現在回檔最深</option>
+      </select>
+    </div>
+    <div class="etfAdd">✍️ 清單沒有你要的?輸入 ETF 代號加入比較:<input id="etfIn" type="text" placeholder="例:00881" autocomplete="off" onkeydown="if(event.key==='Enter')etfAdd()"><button type="button" onclick="etfAdd()">加入</button><span id="etfAddMsg"></span></div>
+    <div id="etfBox"><p class="hint">⏳ 抓 15 檔 ETF 三年資料與配息紀錄…(第一次約 5 秒,之後全站共用快取)</p></div>
+    <p class="hint" id="etfHint" style="margin-top:10px; line-height:1.7;"></p>
   </div>
 
   <div class="card">
@@ -431,7 +464,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-J';
+const APP_VER = 'v20261024-K';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -2022,6 +2055,82 @@ document.addEventListener('click', e => {
     if(chip){ const p = chip.parentNode; track('pick', {src: p && p.id === 'hChips' ? 'hold_chip' : 'quick_chip', stock: (chip.getAttribute('onclick') || '').replace(/^\D*(\w+).*$/, '$1')}); }
   }catch(err){}
 }, true);
+// 🐢 ETF 存股專區:資料由 /.netlify/functions/etf 伺服器端算好(三組平行,CDN 快取 6 小時)
+let ETF = null, etfCat = '全部', etfLoading = false;
+const ETF_CATS = ['全部', '市值型', '高股息', '海外', '債券', '自選'];
+function etfSig(x){
+  if(x.ddNow <= -0.05 && x.deeper <= 0.2) return ['🟢 回檔加碼區', 'var(--red)', `現在離一年高點 ${(x.ddNow * 100).toFixed(1)}%,比過去 ${x.has3 ? '3 年' : '成立以來'} ${Math.round((1 - x.deeper) * 100)}% 的日子都跌得深`];
+  if(x.ddNow > -0.02) return ['🟡 接近高點', 'var(--gold)', '定期定額照常;想單筆投入,分 3–5 批'];
+  return ['🔵 正常區間', 'var(--accent)', '定期定額照常扣款'];
+}
+async function loadEtf(){
+  if(ETF || etfLoading) return; etfLoading = true;
+  try{
+    const rs = await Promise.all([0, 1, 2].map(g => fetch('/.netlify/functions/etf?g=' + g).then(r => r.json()).catch(() => ({list: []}))));
+    ETF = rs.flatMap(r => r.list || []).filter(x => !x.err);
+    try{ const mine = JSON.parse(localStorage.getItem('etfMine') || '[]'); for(const id of mine) etfAdd(id, true); }catch(e){}
+    track('etf_zone', {n: ETF.length});
+  }catch(e){ ETF = []; }
+  etfLoading = false;
+  renderEtf();
+}
+async function etfAdd(idIn, silent){
+  const raw = idIn || ($('etfIn').value || '').trim();
+  const id = (resolveStockId(raw) || raw).toUpperCase();
+  const msg = $('etfAddMsg');
+  if(!/^\d{4,6}[A-Z]?$/.test(id)){ if(!silent) msg.textContent = ' 請輸入代號,例:00881'; return; }
+  if(ETF && ETF.some(x => x.id === id)){ if(!silent){ msg.textContent = ' 已在清單裡'; etfCat = '全部'; renderEtf(); } return; }
+  if(!silent) msg.textContent = ' ⏳ 計算中…';
+  try{
+    const j = await fetch('/.netlify/functions/etf?id=' + encodeURIComponent(id)).then(r => r.json());
+    const x = (j.list || [])[0];
+    if(!x || x.err){ if(!silent) msg.textContent = ' 查無資料'; return; }
+    ETF.push(x);
+    try{ const mine = JSON.parse(localStorage.getItem('etfMine') || '[]'); if(!mine.includes(id)){ mine.push(id); localStorage.setItem('etfMine', JSON.stringify(mine.slice(-8))); } }catch(e){}
+    if(!silent){ msg.textContent = ` ✓ 已加入 ${x.name || id}`; etfCat = '自選'; track('etf_add', {stock: id}); }
+    renderEtf();
+  }catch(e){ if(!silent) msg.textContent = ' 資料源忙線,稍後再試'; }
+}
+function etfRun(id){
+  const nm = (stockList || []).find(s2 => s2.id === id)?.name || (ETF || []).find(x => x.id === id)?.name || '';
+  $('stockId').value = `${id} ${nm}`.trim();
+  const d = new Date(); d.setFullYear(d.getFullYear() - 3); const p2 = n => String(n).padStart(2, '0');
+  $('buyDate').value = `${d.getFullYear()}/${p2(d.getMonth() + 1)}/${p2(d.getDate())}`;
+  updateDcaHint(); if((Number($('dcaAmount').value.replace(/,/g, '')) || 0) === 0) $('dcaAmount').value = '10,000';
+  track('etf_run', {stock: id});
+  run();
+}
+function renderEtf(){
+  const box = $('etfBox'); if(!box) return;
+  $('etfTabs').innerHTML = ETF_CATS.filter(c => c !== '自選' || (ETF || []).some(x => x.cat === '自選'))
+    .map(c => `<button type="button" class="${c === etfCat ? 'on' : ''}" onclick="etfCat='${c}';renderEtf()">${c}</button>`).join('');
+  if(!ETF){ return; }
+  if(!ETF.length){ box.innerHTML = '<p class="down">資料源忙線,請稍後重新整理。</p>'; return; }
+  const key = $('etfSort').value;
+  const val = x => key === 'r3a' ? (x.r3a ?? -9) : key === 'r1' ? (x.r1 ?? -9) : key === 'yld' ? x.yld : key === 'mdd3' ? x.mdd3 : -x.ddNow;
+  const rows = ETF.filter(x => etfCat === '全部' || x.cat === etfCat).slice().sort((a, b) => val(b) - val(a));
+  const P = v => v == null ? '<span class="sub">未滿期</span>' : `<b class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%</b>`;
+  const md = s => s ? s.slice(2, 7).replace('-', '/') : '';
+  box.innerHTML = `<table class="etfT"><thead><tr><th>ETF</th><th>現價</th><th>近 1 年<br>含息</th><th>近 3 年含息<br>(年化)</th><th>3 年內<br>最大回檔</th><th>現在離<br>一年高點</th><th>殖利率<br>(配息)</th><th>最近一次<br>填息</th><th>每月存 1 萬<br>存 3 年</th><th>存股訊號</th><th></th></tr></thead><tbody>`
+    + rows.map(x => {
+      const [sg, sc, sw] = etfSig(x);
+      const fill = !x.fill ? '<span class="sub">—</span>' : x.fill.filled ? `✅ ${x.fill.days} 天<br><span class="sub">${md(x.fill.date)} 除息 ${x.fill.amt}</span>` : `⏳ 已 ${x.fill.days} 天未填<br><span class="sub">${md(x.fill.date)} 除息 ${x.fill.amt}</span>`;
+      const dca = x.dca ? `${P(x.dca.ret)}<br><span class="sub">投入 ${Math.round(x.dca.invested / 1e4)} 萬→${(x.dca.value / 1e4).toFixed(1)} 萬${x.has3 ? '' : '(成立以來)'}</span>` : '';
+      return `<tr class="r"><td class="nm"><b>${x.name || x.id}</b> <span>${x.id}・${x.cat}・${x.freq}${x.has3 ? '' : `・${x.since.slice(0, 7).replace('-', '/')} 起有資料`}</span></td>`
+        + `<td data-k="現價">${fmt(x.price)}</td>`
+        + `<td data-k="近 1 年含息">${P(x.r1)}</td>`
+        + `<td data-k="近 3 年含息(年化)">${x.r3 == null ? P(null) : `${P(x.r3)}<br><span class="sub">年化 ${(x.r3a * 100).toFixed(1)}%</span>`}</td>`
+        + `<td data-k="3 年內最大回檔">${P(x.mdd3)}<br><span class="sub">${md(x.mdd3Peak)}→${md(x.mdd3Trough)}</span></td>`
+        + `<td data-k="現在離一年高點">${P(x.ddNow)}</td>`
+        + `<td data-k="殖利率(配息)">${x.freq === '不配息' ? '<span class="sub">不配息</span>' : `<b>${(x.yld * 100).toFixed(2)}%</b><br><span class="sub">近 ${x.nDiv} 次共 ${x.ttm} 元</span>`}</td>`
+        + `<td data-k="最近一次填息">${fill}</td>`
+        + `<td data-k="每月存 1 萬存 3 年">${dca}</td>`
+        + `<td data-k="存股訊號"><span class="sg" style="color:${sc};" title="${sw}">${sg}</span><br><span class="sub" style="white-space:normal;">${sw}</span></td>`
+        + `<td class="gocell"><button type="button" class="go" onclick="etfRun('${x.id}')">回測這檔 →</button></td></tr>`;
+    }).join('') + '</tbody></table>';
+  const dt = ETF.reduce((a, x) => x.date > a ? x.date : a, '');
+  $('etfHint').innerHTML = `📅 資料日 ${dt}(FinMind 公開資料,伺服器每 6 小時更新)|<b>含息報酬</b>=除息與分割還原後的股價(股息再投入),未扣手續費與基金內扣費用|<b>殖利率</b>=最近一輪配息合計÷現價,是「過去」的配息,不保證未來|成立未滿 3 年的 ETF 不列 3 年數字,定期定額從成立日算|<b>存股訊號</b>:看現在的回檔深度在歷史上排第幾——回檔比 80% 的日子深、且離高點 5% 以上=🟢;離高點 2% 內=🟡<br>⚠️ ${SIG_DISC}。`;
+}
 function applyModeOrder(){
   const mode = curMode();
   document.querySelectorAll('.modeBtn').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
@@ -2038,6 +2147,7 @@ function applyModeOrder(){
   else { if(cb) cont.insertBefore(cb, wb); cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb); }
   const dw = $('deepWrap'); if(dw) dw.open = (mode === 'long');
   const bw = $('btWrap'); if(bw) bw.open = (mode === 'long');
+  const ec = $('etfCard'); if(ec){ ec.style.display = mode === 'long' ? 'block' : 'none'; if(mode === 'long'){ cont.insertBefore(ec, formCard); renderEtf(); loadEtf(); } }
 }
 function setMode(m){
   try{ localStorage.setItem('mode', m); }catch(e){}
