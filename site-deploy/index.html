@@ -181,6 +181,10 @@
     .modeBtn span{font-size:.68rem; line-height:1.3;}
     .mkt{gap:4px 6px; margin-top:8px;} .mkt .m{padding:3px 9px; font-size:.78rem;} .mkt .m .k{font-size:.7rem;}
   }
+  .sigb{margin-top:8px; padding:6px 6px; border-radius:8px; font-size:.78rem; line-height:1.45; text-align:center; border:1px solid var(--border); color:var(--muted);}
+  .sigb b{display:block; font-size:.86rem;} .sigb span{display:block; font-size:.74rem; opacity:.9;}
+  .sigb.g{border-color:var(--red); background:rgba(248,81,73,.08); color:var(--red);} .sigb.y{border-color:var(--gold); background:rgba(210,153,34,.08); color:var(--gold);}
+  .sigb.o{border-color:#f0883e; background:rgba(240,136,62,.08); color:#f0883e;} .sigb.r{border-color:var(--green); background:rgba(63,185,80,.08); color:var(--green);}
   .mkt{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:12px auto 0; max-width:760px;}
   .mkt .m{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(88,166,255,.05); font-size:.88rem;}
   .mkt .m b{font-weight:800;} .mkt .m .k{color:var(--muted); font-size:.8rem;}
@@ -240,7 +244,7 @@
 
   <div class="card" id="topicCard" style="display:none;">
     <h2 class="section">📰 話題雷達——新聞正在追的股票</h2>
-    <p class="subtitle">近 36 小時(跨週末自動延長到週五),哪些股票被新聞點名最多次?統計主流財經媒體<b style="color:var(--text);">報導則數</b>排序(客觀計數,非推薦)——蘋果發表會、輝達財報這種大事,相關供應鏈會自己浮上來。<br><b style="color:var(--accent);">👇 每張卡片都能點——點下去馬上跑五燈檢查表、標註 K 線與完整回測</b></p>
+    <p class="subtitle">近 36 小時(跨週末自動延長到週五),哪些股票被新聞點名最多次?統計主流財經媒體<b style="color:var(--text);">報導則數</b>排序(客觀計數,非推薦)——蘋果發表會、輝達財報這種大事,相關供應鏈會自己浮上來。<br><b style="color:var(--accent);">👇 每張卡片已標好訊號(🟢可進場/🟡觀望/🟠減碼/🔴停損),點下去看完整價位與 K 線</b></p>
     <p id="topicThemes" style="display:none; margin:0 0 10px; font-size:.9rem; color:var(--muted); line-height:2.1;"></p>
     <div class="stats" id="topicBox"></div>
     <p class="hint" style="margin-top:8px;" id="topicHint"></p>
@@ -248,7 +252,7 @@
 
   <div class="card" id="radarCard" style="display:none;">
     <h2 class="section">⚡ 盤後強勢股雷達——今天市場最有戲的股票</h2>
-    <p class="subtitle">官方最新收盤全市場掃描:<b style="color:var(--accent);">🔥 人氣王</b>(成交值最大的上漲權值股)+<b style="color:var(--red);">強勢股</b>(漲幅 ≥5%、成交值 ≥1 億)。<br><b style="color:var(--accent);">👇 每張卡片都能點——點下去馬上跑五燈檢查表與完整回測</b>(僅為客觀數據排序,非選股建議)</p>
+    <p class="subtitle">官方最新收盤全市場掃描:<b style="color:var(--accent);">🔥 人氣王</b>(成交值最大的上漲權值股)+<b style="color:var(--red);">強勢股</b>(漲幅 ≥5%、成交值 ≥1 億)。<br><b style="color:var(--accent);">👇 每張卡片已標好訊號,點下去看進場、停損、停利參考價</b>(僅為客觀數據排序,非選股建議)</p>
     <div class="stats" id="radarBox"></div>
     <p class="hint" style="margin-top:8px;" id="radarHint">⏰ 上市:證交所盤後行情(約 14:00 更新);上櫃:櫃買開放資料(更新較晚,可能落後半天)。想看盤中誰在噴,參考上方話題雷達的即時價。點卡片下去,回檔統計表和檢查表有答案——追之前先看劇本。</p>
   </div>
@@ -423,7 +427,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-D';
+const APP_VER = 'v20261024-E';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -1953,6 +1957,37 @@ async function renderMktStrip(){
   }catch(e){}
 }
 function curMode(){ const m = localStorage.getItem('mode'); return (m === 'hold' || m === 'one' || m === 'long') ? m : 'one'; }
+// 🚦 雷達卡訊號徽章:每張熱門卡背景跑一次訊號卡(同時最多 2 檔、同一檔同一天只算一次)——想進場的人不用一張張點
+window.__sigCache = window.__sigCache || {};
+let __sigQ = [], __sigRun = 0;
+function fillSigBadges(box){
+  if(!box) return;
+  box.querySelectorAll('.stat.tap[data-sid]').forEach(el => { if(!el.dataset.sq){ el.dataset.sq = '1'; __sigQ.push(el); } });
+  const pump = async () => {
+    while(__sigRun < 2 && __sigQ.length){
+      const el = __sigQ.shift(), id = el.dataset.sid; __sigRun++;
+      (async () => {
+        let g = window.__sigCache[id];
+        try{
+          if(g === undefined){ const R = await loadRecent(id, true); const ck = (R && R.s.length >= 65) ? taChecklist(R.s, R.instNet) : null; g = ck ? ck.sig : null; window.__sigCache[id] = g; }
+        }catch(e){ g = null; }
+        const b = el.querySelector('.sigb');
+        if(b){
+          if(!g){ b.textContent = '資料不足,點進去看'; b.className = 'sigb n'; }
+          else {
+            const kv = g.cls === 'g' ? `進場 ${g.zone}・停損 ${fmt(g.stop)}`
+              : g.cls === 'y' ? (g.zone ? `等拉回 ${g.zone}` : '等條件成立')
+              : g.cls === 'o' ? (g.stop > 0 ? `持有者跌破 ${fmt(g.stop)} 出場` : '持有者減碼')
+              : '空手不進場';
+            b.innerHTML = `<b>${g.tag}</b><span>${kv}</span>`; b.className = 'sigb ' + g.cls;
+          }
+        }
+        __sigRun--; pump();
+      })();
+    }
+  };
+  pump();
+}
 function applyModeOrder(){
   const mode = curMode();
   document.querySelectorAll('.modeBtn').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
@@ -1963,8 +1998,10 @@ function applyModeOrder(){
   // 2026-10 改版:散戶進站第一件事是「打代號」——輸入框永遠在最上面,結果緊接在下;回訪卡、話題雷達、強勢股雷達排在後面(想找飆股的人往下滑)
   if(mode === 'hold'){ if(hold) cont.insertBefore(hold, wb); }
   cont.insertBefore(formCard, wb); if(results) cont.insertBefore(results, wb);
-  const cb = $('comebackCard'); if(cb) cont.insertBefore(cb, wb);
-  cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb);
+  // 想進場:熱門股就是候選清單,話題雷達、強勢股雷達緊接在輸入框下面(結果區還沒跑時是隱藏的);回訪卡排後面
+  const cb = $('comebackCard');
+  if(mode === 'one'){ cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb); if(cb) cont.insertBefore(cb, wb); }
+  else { if(cb) cont.insertBefore(cb, wb); cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb); }
   const dw = $('deepWrap'); if(dw) dw.open = (mode === 'long');
 }
 function setMode(m){
@@ -3169,15 +3206,16 @@ async function renderRadar(){
     box.innerHTML = hot.map(h => {
       const lu = h.pct >= 9.4, label = (h.name || h.id).replace(/[<>'"*]/g, '').trim();
       const tag = h.k ? '<span style="color:var(--accent); font-weight:700;">🔥 人氣</span>' : (lu ? '<span style="color:var(--red); font-weight:700;">🔒 漲停</span>' : '<span style="opacity:.7;">強勢</span>');
-      return `<div class="stat tap" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
+      return `<div class="stat tap" data-sid="${h.id}" style="cursor:pointer;" onclick="quickRun('${h.id} ${label}')">`
         + `<div class="label">${label}<span style="float:right; font-size:.7rem;">${tag}</span></div>`
         + `<div class="up" style="font-size:1.4rem; font-weight:800; line-height:1.2;">${fmt(h.c)}</div>`
         + `<div class="up" style="font-size:.88rem; font-weight:700; margin-top:2px;">▲ ${pct(h.pct)}</div>`
-        + `<div class="sub">成交 ${(h.val / 1e8).toFixed(1)} 億</div></div>`;
+        + `<div class="sub">成交 ${(h.val / 1e8).toFixed(1)} 億</div><div class="sigb">⏳ 算訊號…</div></div>`;
     }).join('');
     if(window.SCAN_DATE) $('radarHint').innerHTML = `⏰ <b style="color:var(--gold);">上市資料日:${window.SCAN_DATE}</b>|` + $('radarHint').innerHTML;
     card.style.display = 'block';
     window.__hotList = hot;
+    fillSigBadges(box);
     try{ renderHotChips(hot); }catch(e){}   // 熱門名單同步餵給持倉計算的預設按鈕與熱門一鍵回測
     track('radar', {n: hot.length});
     scrollToRes();   // 這塊長在結果區上方,長完重新對準
@@ -3247,20 +3285,22 @@ async function renderTopic(){
       const mid = hasP
         ? `<div class="${cls(d1)}" style="font-size:1.35rem; font-weight:800; line-height:1.2;">${fmt(lv.p)}</div><div class="${cls(d1)}" style="font-size:.85rem; font-weight:700;">${pct(d1)}</div>`
         : `<div style="font-size:1.2rem; font-weight:800; color:var(--accent); line-height:1.4;">📰 ${x.n} 則</div>`;
-      return `<div class="stat tap" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
+      return `<div class="stat tap" data-sid="${x.id}" style="cursor:pointer;" onclick="quickRun('${x.id} ${nm}')">`
         + `<div class="label">${nm}<span style="float:right; font-size:.7rem; color:${x.burst ? 'var(--red)' : 'var(--gold)'}; font-weight:700;">${x.burst ? '🔥 今日爆發・' : ''}${x.n} 則</span></div>`
         + mid
-        + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div></div>`;
+        + `<div class="sub" style="text-align:left; line-height:1.55;">${x.t}${x.m >= 5 ? `<br><span style="color:var(--gold);">⚠️ 另有權證/行銷稿 ${x.m} 則——有人花錢炒熱度,留意出貨劇本</span>` : ''}</div><div class="sigb">⏳ 算訊號…</div></div>`;
     };
     // 首屏開胃菜:電腦 5 張、手機 6 張——別把輸入框推出視野;其餘的放「更多話題股」補到 15
     try{ window.__chipPool = window.__chipPool || {hot: [], topic: []}; window.__chipPool.topic = top.slice(0, 8).map(x => ({id: x.id, name: nameOf(x.id)})); renderHotChips(); }catch(e){}   // 話題股也進熱門按鈕
     const topN = window.innerWidth <= 640 ? 6 : 5;
     box.innerHTML = top.slice(0, topN).map(mkCard).join('');
+    fillSigBadges(box);
     $('topicHint').textContent = `統計日:${j.day}|同稿轉發只計一次;權證/行銷稿另計並標警示|報導多=市場在看,不代表該買——完整前 15 名在下方「更多話題股」。${fromCache ? '|📡 目前為快取資料,背景更新中' : ''}`;
     card.style.display = 'block';
     const rest = top.slice(topN);
     if(rest.length && $('topic2Box')){
       $('topic2Box').innerHTML = rest.map(mkCard).join('');
+      setTimeout(() => fillSigBadges($('topic2Box')), 6000);
       $('topic2Card').style.display = 'block';
     }
     track('topic', {n: top.length});
