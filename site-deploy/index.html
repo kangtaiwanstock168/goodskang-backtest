@@ -292,12 +292,12 @@
     <div class="etfBar">
       <div class="etfTabs" id="etfTabs"></div>
       <select id="etfSort" onchange="renderEtf()">
-        <option value="r3a">排序:近 3 年年化(含息)</option><option value="r1">排序:近 1 年(含息)</option>
+        <option value="vol">排序:今日成交量(熱門)</option><option value="r3a">排序:近 3 年年化(含息)</option><option value="r1">排序:近 1 年(含息)</option>
         <option value="yld">排序:殖利率</option><option value="mdd3">排序:最大回檔(小→大)</option><option value="dd">排序:現在回檔最深</option>
       </select>
     </div>
     <div class="etfAdd">✍️ 清單沒有你要的?輸入 ETF 代號加入比較:<input id="etfIn" type="text" placeholder="例:00881" autocomplete="off" onkeydown="if(event.key==='Enter')etfAdd()"><button type="button" onclick="etfAdd()">加入</button><span id="etfAddMsg"></span></div>
-    <div id="etfBox"><p class="hint">⏳ 抓 15 檔 ETF 三年資料與配息紀錄…(第一次約 5 秒,之後全站共用快取)</p></div>
+    <div id="etfBox"><p class="hint">⏳ 抓今日成交量前 30 名+常見存股 ETF 的三年資料與配息紀錄…(第一次約 10 秒,之後全站共用快取)</p></div>
     <p class="hint" id="etfHint" style="margin-top:10px; line-height:1.7;"></p>
   </div>
 
@@ -466,7 +466,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-M';
+const APP_VER = 'v20261024-N';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -2059,8 +2059,22 @@ document.addEventListener('click', e => {
 }, true);
 // 🐢 ETF 存股專區:資料由 /.netlify/functions/etf 伺服器端算好(三組平行,CDN 快取 6 小時)
 let ETF = null, etfCat = '全部', etfLoading = false;
-const ETF_CATS = ['全部', '市值型', '高股息', '海外', '債券', '自選'];
+const ETF_CATS = ['全部', '市值型', '高股息', '主題型', '主動式', '海外', '債券', '槓桿/反向', '自選'];
+let ETF_HOT_D = '';
+// 熱門榜進來的 ETF 依代號尾碼與名稱自動分類(順序有意義:槓桿/債券/主動先判)
+function etfCatOf(id, nm){
+  nm = nm || '';
+  if(/[LR]$/.test(id)) return '槓桿/反向';
+  if(/B$/.test(id) || /債/.test(nm)) return '債券';
+  if(/A$/.test(id) || /^主動/.test(nm)) return '主動式';
+  if(/S&P|NASDAQ|那斯達克|美國|美股|日本|日經|韓國|KOSPI|中國|滬深|上証|印度|越南|費城|全球|台日韓|歐洲/.test(nm)) return '海外';
+  if(/高股息|高息|股息|收益|優息|填息|息/.test(nm)) return '高股息';
+  if(/台灣50|臺灣50|TOP50|公司治理|ESG|永續|領袖50|中型100|台灣中小|MSCI|台灣加權|臺灣加權/.test(nm)) return '市值型';
+  return '主題型';
+}
 function etfSig(x){
+  if(x.cat === '槓桿/反向') return ['⚠️ 不適合存股', 'var(--muted)', '槓桿/反向型每日重設倍數,長期持有會被波動耗損;只適合短線'];
+  if(!x.has1) return ['⚪ 成立未滿 1 年', 'var(--muted)', '歷史資料不足以判斷回檔位置,先看成分股與費用'];
   if(x.ddNow <= -0.05 && x.deeper <= 0.2) return ['🟢 回檔加碼區', 'var(--red)', `現在離一年高點 ${(x.ddNow * 100).toFixed(1)}%,比過去 ${x.has3 ? '3 年' : '成立以來'} ${Math.round((1 - x.deeper) * 100)}% 的日子都跌得深`];
   if(x.ddNow > -0.02) return ['🟡 接近高點', 'var(--gold)', '定期定額照常;想單筆投入,分 3–5 批'];
   return ['🔵 正常區間', 'var(--accent)', '定期定額照常扣款'];
@@ -2068,8 +2082,22 @@ function etfSig(x){
 async function loadEtf(){
   if(ETF || etfLoading) return; etfLoading = true;
   try{
-    const rs = await Promise.all([0, 1, 2].map(g => fetch('/.netlify/functions/etf?v=3&g=' + g).then(r => r.json()).catch(() => ({list: []}))));
-    ETF = rs.flatMap(r => r.list || []).filter(x => !x.err);
+    // ① 核心 15 檔(三組固定快取)+ ② 證交所/櫃買當日成交量前 30 名 ETF(動態;不在核心清單的再分批算)
+    const [core, hot] = await Promise.all([
+      Promise.all([0, 1, 2].map(g => fetch('/.netlify/functions/etf?v=3&g=' + g).then(r => r.json()).catch(() => ({list: []})))).then(rs => rs.flatMap(r => r.list || [])),
+      fetch('/.netlify/functions/etfhot?v=1').then(r => r.json()).catch(() => ({list: []}))]);
+    ETF_HOT_D = hot.d || '';
+    const hotTop = (hot.list || []).slice(0, 30);
+    const have = new Set(core.map(x => x.id));
+    const extra = hotTop.map(h => h.id).filter(id => !have.has(id)).sort();
+    const chunks = []; for(let k = 0; k < extra.length; k += 6) chunks.push(extra.slice(k, k + 6));
+    const more = (await Promise.all(chunks.map(c => fetch('/.netlify/functions/etf?v=3&ids=' + c.join(',')).then(r => r.json()).catch(() => ({list: []}))))).flatMap(r => r.list || []);
+    ETF = core.concat(more).filter(x => !x.err);
+    const hm = {}; hotTop.forEach((h, i) => hm[h.id] = Object.assign({rank: i + 1}, h));
+    for(const x of ETF){
+      const h = hm[x.id]; if(h){ x.hot = h; if(!x.name) x.name = h.name; }
+      if(!x.cat) x.cat = etfCatOf(x.id, x.name);
+    }
     try{ const mine = JSON.parse(localStorage.getItem('etfMine') || '[]'); for(const id of mine) etfAdd(id, true); }catch(e){}
     track('etf_zone', {n: ETF.length});
   }catch(e){ ETF = []; }
@@ -2109,16 +2137,17 @@ function renderEtf(){
   if(!ETF){ return; }
   if(!ETF.length){ box.innerHTML = '<p class="down">資料源忙線,請稍後重新整理。</p>'; return; }
   const key = $('etfSort').value;
-  const val = x => key === 'r3a' ? (x.r3a ?? -9) : key === 'r1' ? (x.r1 ?? -9) : key === 'yld' ? x.yld : key === 'mdd3' ? x.mdd3 : -x.ddNow;
+  const val = x => key === 'vol' ? (x.hot ? x.hot.lots : -1) : key === 'r3a' ? (x.r3a ?? -9) : key === 'r1' ? (x.r1 ?? -9) : key === 'yld' ? x.yld : key === 'mdd3' ? x.mdd3 : -x.ddNow;
   const rows = ETF.filter(x => etfCat === '全部' || x.cat === etfCat).slice().sort((a, b) => val(b) - val(a));
   const P = v => v == null ? '<span class="sub">未滿期</span>' : `<b class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%</b>`;
   const md = s => s ? s.slice(2, 7).replace('-', '/') : '';
-  box.innerHTML = `<div class="etfWrap"><table class="etfT"><thead><tr><th>ETF</th><th>現價</th><th>近 1 年<br>含息</th><th>近 3 年含息<br>(年化)</th><th>3 年內<br>最大回檔</th><th>殖利率<br>最近填息</th><th>每月存 1 萬<br>存 3 年</th><th style="text-align:left;">存股訊號</th></tr></thead><tbody>`
+  box.innerHTML = `<div class="etfWrap"><table class="etfT"><thead><tr><th>ETF</th><th>今日成交量<br>(張)</th><th>現價</th><th>近 1 年<br>含息</th><th>近 3 年含息<br>(年化)</th><th>3 年內<br>最大回檔</th><th>殖利率<br>最近填息</th><th>每月存 1 萬<br>存 3 年</th><th style="text-align:left;">存股訊號</th></tr></thead><tbody>`
     + rows.map(x => {
       const [sg, sc, sw] = etfSig(x);
       const fill = !x.fill ? '' : x.fill.filled ? `<br><span class="sub">✅ ${md(x.fill.date)} 除息 ${x.fill.amt},${x.fill.days} 天填息</span>` : `<br><span class="sub">⏳ ${md(x.fill.date)} 除息 ${x.fill.amt},已 ${x.fill.days} 天未填</span>`;
       const dca = x.dca ? `${P(x.dca.ret)}<br><span class="sub">${Math.round(x.dca.invested / 1e4)} 萬→${(x.dca.value / 1e4).toFixed(1)} 萬${x.has3 ? '' : '(成立以來)'}</span>` : '';
       return `<tr class="r"><td class="nm"><b>${x.name || x.id}</b> <span>${x.id}・${x.cat}・${x.freq}${x.has3 ? '' : `・${x.since.slice(0, 7).replace('-', '/')} 起`}</span></td>`
+        + `<td data-k="今日成交量(張)">${x.hot ? `<b>${x.hot.lots.toLocaleString('zh-TW')}</b><br><span class="sub">#${x.hot.rank}・${(x.hot.val / 1e8).toFixed(1)} 億</span>` : '<span class="sub">—</span>'}</td>`
         + `<td data-k="現價">${fmt(x.price)}</td>`
         + `<td data-k="近 1 年含息">${P(x.r1)}</td>`
         + `<td data-k="近 3 年含息(年化)">${x.r3 == null ? P(null) : `${P(x.r3)}<br><span class="sub">年化 ${(x.r3a * 100).toFixed(1)}%</span>`}</td>`
@@ -2128,7 +2157,7 @@ function renderEtf(){
         + `<td data-k="存股訊號" class="sgcell" style="text-align:left; white-space:normal; min-width:170px;"><span class="sg" style="color:${sc};">${sg}</span> <span class="sub">離高點 ${(x.ddNow * 100).toFixed(1)}%</span><br><span class="sub">${sw}</span><br><button type="button" class="go" onclick="etfRun('${x.id}')">回測這檔 →</button></td></tr>`;
     }).join('') + '</tbody></table></div>';
   const dt = ETF.reduce((a, x) => x.date > a ? x.date : a, '');
-  $('etfHint').innerHTML = `📅 資料日 ${dt}(FinMind 公開資料,伺服器每 6 小時更新)|<b>含息報酬</b>=除息與分割還原後的股價(股息再投入),未扣手續費與基金內扣費用|<b>殖利率</b>=最近一輪配息合計÷現價,是「過去」的配息,不保證未來|成立未滿 3 年的 ETF 不列 3 年數字,定期定額從成立日算|<b>存股訊號</b>:看現在的回檔深度在歷史上排第幾——回檔比 80% 的日子深、且離高點 5% 以上=🟢;離高點 2% 內=🟡<br>⚠️ ${SIG_DISC}。`;
+  $('etfHint').innerHTML = `🔥 <b>熱門榜</b>=證交所/櫃買 ${ETF_HOT_D || ''} 收盤成交量前 30 名 ETF(另含 15 檔常見存股標的,沒上榜的成交量顯示「—」)|📅 報酬資料日 ${dt}(FinMind 公開資料,伺服器每 6 小時更新)|<b>含息報酬</b>=除息與分割還原後的股價(股息再投入),未扣手續費與基金內扣費用|<b>殖利率</b>=最近一輪配息合計÷現價,是「過去」的配息,不保證未來|成立未滿 3 年的 ETF 不列 3 年數字,定期定額從成立日算|<b>存股訊號</b>:看現在的回檔深度在歷史上排第幾——回檔比 80% 的日子深、且離高點 5% 以上=🟢;離高點 2% 內=🟡<br>⚠️ ${SIG_DISC}。`;
 }
 function applyModeOrder(){
   const mode = curMode();
