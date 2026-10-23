@@ -464,7 +464,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-K';
+const APP_VER = 'v20261024-L';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -2066,7 +2066,7 @@ function etfSig(x){
 async function loadEtf(){
   if(ETF || etfLoading) return; etfLoading = true;
   try{
-    const rs = await Promise.all([0, 1, 2].map(g => fetch('/.netlify/functions/etf?g=' + g).then(r => r.json()).catch(() => ({list: []}))));
+    const rs = await Promise.all([0, 1, 2].map(g => fetch('/.netlify/functions/etf?v=3&g=' + g).then(r => r.json()).catch(() => ({list: []}))));
     ETF = rs.flatMap(r => r.list || []).filter(x => !x.err);
     try{ const mine = JSON.parse(localStorage.getItem('etfMine') || '[]'); for(const id of mine) etfAdd(id, true); }catch(e){}
     track('etf_zone', {n: ETF.length});
@@ -2082,7 +2082,7 @@ async function etfAdd(idIn, silent){
   if(ETF && ETF.some(x => x.id === id)){ if(!silent){ msg.textContent = ' 已在清單裡'; etfCat = '全部'; renderEtf(); } return; }
   if(!silent) msg.textContent = ' ⏳ 計算中…';
   try{
-    const j = await fetch('/.netlify/functions/etf?id=' + encodeURIComponent(id)).then(r => r.json());
+    const j = await fetch('/.netlify/functions/etf?v=3&id=' + encodeURIComponent(id)).then(r => r.json());
     const x = (j.list || [])[0];
     if(!x || x.err){ if(!silent) msg.textContent = ' 查無資料'; return; }
     ETF.push(x);
