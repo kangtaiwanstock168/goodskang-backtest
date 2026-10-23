@@ -50,10 +50,17 @@ async function calcOne(id, cat){
   const dds = []; { let pk = 0; for(let k = 0; k < n; k++){ pk = Math.max(pk, d[k].close); dds.push(d[k].close / pk - 1); } }
   const deeper = dds.filter(x => x < ddNow).length / dds.length;
   // 配息:近 12 個月現金股息(換算成今天的股數基準)
-  const t12 = ymd(new Date(new Date(last.date).getTime() - 365 * 864e5));
-  const cash = divs.filter(x => x.date > t12 && /息/.test(x.stock_or_cache_dividend || '息'));
-  const ttm = cash.reduce((a, x) => a + (x.stock_and_cache_dividend || 0) * splitF(x.date), 0);
-  const freq = cash.length >= 10 ? '月配' : cash.length >= 4 ? '季配' : cash.length >= 2 ? '半年配' : cash.length === 1 ? '年配' : '不配息';
+  // 頻率用「相鄰兩次除息的間隔中位數」判斷,殖利率=最近 k 次(月 12/季 4/半年 2/年 1)加總——不用 365 天硬切,避免邊界多算一季
+  const allCash = divs.filter(x => /息/.test(x.stock_or_cache_dividend || '息') && x.stock_and_cache_dividend > 0);
+  const t400 = ymd(new Date(new Date(last.date).getTime() - 400 * 864e5));
+  let freq = '不配息', k = 0;
+  if(allCash.length && allCash[allCash.length - 1].date > t400){
+    const gaps = []; for(let j = 1; j < allCash.length; j++) gaps.push((new Date(allCash[j].date) - new Date(allCash[j-1].date)) / 864e5);
+    gaps.sort((a, b) => a - b); const gm = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 365;
+    [freq, k] = gm <= 45 ? ['月配', 12] : gm <= 110 ? ['季配', 4] : gm <= 220 ? ['半年配', 2] : ['年配', 1];
+  }
+  const cash = k ? allCash.slice(-k) : [];
+  const ttm = cash.reduce((a, x) => a + x.stock_and_cache_dividend * splitF(x.date), 0);
   // 最近一次除息的填息狀況(用原始價)
   let fill = null;
   const lastDiv = divs.length ? divs[divs.length - 1] : null;
