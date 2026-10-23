@@ -2,7 +2,9 @@
 // 與網站同一套順勢檢查表與訊號卡規則(taChecklist 由 index.html 原樣抽出);CDN 快取 12 小時。© 2026 阿康(goodskang)
 const FM = 'https://api.finmindtrade.com/api/v4/data?';
 const SITE = 'https://stock.goodskang.tw';
-const IDS = ["2330", "0050", "00631L", "6781", "3017", "1717", "2303", "2327", "6278", "4958", "3037", "2409", "2360", "6182", "2408", "2883", "3227", "5246", "7710", "1303", "2059", "4513", "6116", "6213", "6415", "8039", "2221", "2312", "2472", "0052", "6208", "6271", "6770", "8046", "8150", "1708", "1815", "2308", "2454", "2486", "4526", "6173", "6672", "6727", "2345", "2376", "2382", "2383", "3008", "3010", "3167", "3231", "3441", "3479", "3481", "5425", "6438", "7772", "8210", "8227", "9816", "1785", "2340", "2344", "2388", "2466", "2481", "2489", "2492", "2887", "3030", "3211", "3669", "4938", "5388", "0056", "6187", "6207", "6257", "6274", "6285", "6669", "8299", "00878", "2317", "2412", "2881", "2882", "2891", "3711", "2886", "2884", "1216", "2002", "2357", "2885", "2892", "5880", "2207", "1301", "2603", "2880", "3034", "2395", "2912", "6505", "3045", "2301", "2379", "5871", "2890", "1101", "3443", "3661", "3533", "2368", "3653", "2449", "6488", "5274", "3529", "2618", "2609", "2615", "1513", "1519", "1504", "6446", "4743", "1795", "3293", "8069", "6147", "2049", "3044", "2313", "2367", "6239", "3189", "8358", "3105", "2458", "3016", "006208", "00692", "00850", "00919", "00929", "00713", "00918", "00940", "00646", "00662", "00679B", "00687B", "00937B", "00881", "00981A", "00685L", "00632R"];
+const LIST = [["2330", "台積電"], ["0050", "元大台灣50"], ["00631L", "元大台灣50正2"], ["6781", "AES-KY"], ["3017", "奇鋐"], ["1717", "長興"], ["2303", "聯電"], ["2327", "國巨"], ["6278", "台表科"], ["4958", "臻鼎-KY"], ["3037", "欣興"], ["2409", "友達"], ["2360", "致茂"], ["6182", "合晶"], ["2408", "南亞科"], ["2883", "凱基金"], ["3227", "原相"], ["5246", "勵威"], ["7710", "東擎科技"], ["1303", "南亞"], ["2059", "川湖"], ["4513", "福裕"], ["6116", "彩晶"], ["6213", "聯茂"], ["6415", "矽力-KY"], ["8039", "台虹"], ["2221", "大甲"], ["2312", "金寶"], ["2472", "立隆電"], ["0052", "富邦科技"], ["6271", "同欣電"], ["6770", "力積電"], ["8046", "南電"], ["8150", "南茂"], ["1708", "東鹼"], ["1815", "富喬"], ["2308", "台達電"], ["2454", "聯發科"], ["2486", "一詮"], ["4526", "東台"], ["6173", "信昌電"], ["6672", "騰輝電子-KY"], ["6727", "亞泰金屬"], ["2345", "智邦"], ["2376", "技嘉"], ["2382", "廣達"], ["2383", "台光電"], ["3008", "大立光"], ["3010", "華立"], ["3167", "大量"], ["3231", "緯創"], ["3441", "聯一光"], ["3479", "安勤"], ["3481", "群創"], ["5425", "台半"], ["6438", "迅得"], ["7772", "耀穎"], ["8210", "勤誠"], ["8227", "巨有科技"], ["1785", "光洋科"], ["2340", "台亞"], ["2344", "華邦電"], ["2388", "威盛"], ["2466", "冠西電"], ["2481", "強茂"], ["2489", "瑞軒"], ["2492", "華新科"], ["2887", "台新新光金"], ["3030", "德律"], ["3211", "順達"], ["3669", "圓展"], ["4938", "和碩"], ["5388", "中磊"], ["0056", "元大高股息"], ["6187", "萬潤"], ["6207", "雷科"], ["6257", "矽格"], ["6274", "台燿"], ["6285", "啟碁"], ["6669", "緯穎"], ["8299", "群聯"], ["00878", "國泰永續高股息"], ["2317", "鴻海"], ["2412", "中華電"], ["2881", "富邦金"], ["2882", "國泰金"], ["2891", "中信金"], ["3711", "日月光投控"], ["2886", "兆豐金"], ["2884", "玉山金"], ["1216", "統一"], ["2002", "中鋼"], ["2357", "華碩"], ["2885", "元大金"], ["2892", "第一金"], ["5880", "合庫金"], ["2207", "和泰車"], ["1301", "台塑"], ["2603", "長榮"], ["2880", "華南金"], ["3034", "聯詠"], ["2395", "研華"], ["2912", "統一超"], ["6505", "台塑化"], ["3045", "台灣大"], ["2301", "光寶科"], ["2379", "瑞昱"], ["5871", "中租-KY"], ["2890", "永豐金"], ["1101", "台泥"], ["3661", "世芯-KY"], ["3533", "嘉澤"], ["2368", "金像電"], ["3653", "健策"], ["2449", "京元電子"], ["6488", "環球晶"], ["5274", "信驊"], ["3529", "力旺"], ["2618", "長榮航"], ["2609", "陽明"], ["2615", "萬海"], ["1513", "中興電"], ["1519", "華城"], ["1504", "東元"], ["6446", "藥華藥"], ["4743", "合一"], ["1795", "美時"], ["8069", "元太"], ["6147", "頎邦"], ["2049", "上銀"], ["3044", "健鼎"], ["2313", "華通"], ["2367", "燿華"], ["6239", "力成"], ["3189", "景碩"], ["8358", "金居"], ["3105", "穩懋"], ["2458", "義隆"], ["3016", "嘉晶"], ["006208", "富邦台50"], ["00692", "富邦公司治理"], ["00850", "元大臺灣ESG永續"], ["00919", "群益台灣精選高息"], ["00929", "復華台灣科技優息"], ["00713", "元大台灣高息低波"], ["00918", "大華優利高填息30"], ["00940", "元大台灣價值高息"], ["00646", "元大S&P500"], ["00662", "富邦NASDAQ"], ["00679B", "元大美債20年"], ["00687B", "國泰20年美債"], ["00937B", "群益ESG投等債20+"], ["00881", "國泰台灣科技龍頭"], ["00981A", "主動統一台股增長"], ["00685L", "群益臺灣加權正2"], ["00632R", "元大台灣50反1"]];
+const IDS = LIST.map(x => x[0]);
+const NAME = Object.fromEntries(LIST);
 let window = {};
 const fmt = (n, d = 2) => Number(n).toLocaleString('zh-TW', {minimumFractionDigits: d, maximumFractionDigits: d});
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -432,7 +434,7 @@ function shell({title, desc, canon, body, ld}){
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-0YWS8NKT6R"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-0YWS8NKT6R",{page_type:"stock_page"});</script></head><body><div class="w">${body}</div></body></html>`;
 }
 function linksHtml(cur){
-  return '<p class="links">' + IDS.filter(x => x !== cur).slice(0, 40).map(x => `<a href="/stock/${x}">${x}</a>`).join('') + ` <a href="/stock/">全部 →</a></p>`;
+  return '<p class="links">' + IDS.filter(x => x !== cur).slice(0, 40).map(x => `<a href="/stock/${x}">${esc(NAME[x] || '')} ${x}</a>`).join('') + ` <a href="/stock/">全部 →</a></p>`;
 }
 async function stockPage(id){
   const [r, etfM] = await Promise.all([analyze(id), /^00/.test(id) ? (async () => { try{ return await require('./etf.js').calcOne(id, ''); }catch(e){ return null; } })() : null]);
@@ -451,7 +453,7 @@ async function stockPage(id){
   const tagPlain = strip(g.tag || ''), verdict = strip(ck.verdict).replace(/^🚦\s*綜合[::]?/, '');
   const faq = [
     [`${name}(${id})現在可以買嗎?`, `依 ${md} 收盤 ${fmt(raw)} 元的數據,訊號為「${tagPlain}」:${strip(g.act)}。${g.zone ? `進場參考區 ${g.zone}。` : strip(g.zoneWhy) + '。'}${DISC}`],
-    [`${name}停損價設多少?`, g.stop > 0 ? `停損參考 ${fmt(g.stop)} 元(距現價 ${pc(g.stopPct)}),${strip(g.stopWhy)}。持有者:${strip(g.holdAct)}。` : `目前已跌破防守,停損條件已觸發;${strip(g.holdAct)}。`],
+    [`${name}停損價設多少?`, g.stop > 0 ? `停損參考 ${fmt(g.stop)} 元(距現價 ${pc(g.stopPct)}),${strip(g.stopWhy)}。${strip(g.holdAct)}。` : `目前已跌破防守,停損條件已觸發;${strip(g.holdAct)}。`],
     [`${name}上檔壓力/停利價在哪?`, g.tp1 > 0 ? `${g.cls === 'o' ? '反彈壓力' : '停利參考①'} ${fmt(g.tp1)} 元(${strip(g.tp1Why)})${g.tp2 > 0 && g.cls !== 'o' ? `;停利參考② ${fmt(g.tp2)} 元(${strip(g.tp2Why)})` : ''}。` : '目前沒有停利參考價(停損訊號或資料不足)。'],
   ];
   let etfHtml = '';
@@ -467,7 +469,7 @@ ${etfM.fill ? `<tr><th>最近填息</th><td>${esc(etfM.fill.date)} 除息 ${etfM
     if(etfM.freq !== '不配息') faq.push([`${name}殖利率多少?多久配一次?`, `${etfM.freq},最近 ${etfM.nDiv} 次合計 ${etfM.ttm} 元,以現價計算殖利率 ${(etfM.yld * 100).toFixed(2)}%(過去配息,不保證未來)。`]);
     if(etfM.r3 != null) faq.push([`${name}近 3 年報酬多少?`, `含息總報酬 ${(etfM.r3 * 100).toFixed(1)}%,年化 ${(etfM.r3a * 100).toFixed(1)}%;3 年內最大回檔 ${(etfM.mdd3 * 100).toFixed(1)}%。`]);
   }
-  const title = `${name}(${id})${isEtf ? 'ETF' : '股票'}分析:今日訊號${tagPlain.replace(/^\S+\s*/, '')}、停損與停利參考價｜${md} 更新`;
+  const title = `${name}(${id})${isEtf ? 'ETF' : ''}今日訊號、停損價、停利價${isEtf ? '、殖利率' : ''}｜${md} 更新｜阿康的台股 AI 作戰室`;
   const desc = `${name}(${id}) ${md} 收盤 ${fmt(raw)} 元(${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%)。訊號:${tagPlain}${g.stop > 0 ? `,停損參考 ${fmt(g.stop)}` : ''}${g.tp1 > 0 ? `,${g.cls === 'o' ? '壓力' : '停利參考'} ${fmt(g.tp1)}` : ''}。五燈 ${ck.score}/${ck.nItems}${isEtf && etfM && etfM.yld ? `,殖利率 ${(etfM.yld * 100).toFixed(2)}%` : ''}。免費、每日更新。`;
   const canon = `${SITE}/stock/${id}`;
   const body = `<p class="crumb"><a href="/">阿康的台股 AI 作戰室</a> › <a href="/stock/">個股與 ETF 分析</a> › ${esc(name)}</p>
@@ -497,8 +499,8 @@ async function hubPage(){
   let names = {};
   const body = `<p class="crumb"><a href="/">阿康的台股 AI 作戰室</a> › 個股與 ETF 分析</p><h1>台股個股與 ETF 每日分析:訊號、停損、停利參考價</h1>
 <p>每一檔都用同一套順勢規則(頭底結構、月線、量價、法人籌碼、防守位)每日自動計算,ETF 另附含息總報酬、最大回檔、殖利率與配息頻率。</p>
-<h2>📈 個股</h2><p class="links">${stk.map(x => `<a href="/stock/${x}">${x}</a>`).join('')}</p>
-<h2>🐢 ETF</h2><p class="links">${etf.map(x => `<a href="/stock/${x}">${x}</a>`).join('')}</p>
+<h2>📈 個股</h2><p class="links">${stk.map(x => `<a href="/stock/${x}">${esc(NAME[x] || '')} ${x}</a>`).join('')}</p>
+<h2>🐢 ETF</h2><p class="links">${etf.map(x => `<a href="/stock/${x}">${esc(NAME[x] || '')} ${x}</a>`).join('')}</p>
 <a class="cta" href="/">開啟互動版作戰室 →</a><p class="disc">⚠️ ${DISC}</p>`;
   const ld = {'@context': 'https://schema.org', '@type': 'CollectionPage', name: '台股個股與 ETF 每日分析', url: SITE + '/stock/', inLanguage: 'zh-Hant-TW'};
   return {statusCode: 200, headers: {'content-type': 'text/html; charset=utf-8', 'netlify-cdn-cache-control': 'public, s-maxage=86400, durable'}, body: shell({title: '台股個股與 ETF 每日分析|停損停利參考價、殖利率、含息報酬|阿康的台股 AI 作戰室', desc: '台積電、聯電、鴻海、0050、0056、00878 等熱門台股與 ETF 每日自動分析:今日訊號、進場參考、停損與停利參考價、五燈技術檢查表,ETF 含息報酬與殖利率。免費。', canon: SITE + '/stock/', body, ld})};
@@ -510,10 +512,13 @@ function sitemap(){
     body: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `<url><loc>${u}</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq></url>`).join('\n')}\n</urlset>`};
 }
 exports.handler = async (event) => {
+  // 路由:Netlify rewrite 後 event.path 可能是原始路徑(/stock/2330)或函式路徑(/.netlify/functions/page/2330)——兩種都取最後一段
   const q = event.queryStringParameters || {};
-  if(q.sitemap) return sitemap();
-  if(q.hub || !q.id) return hubPage();
-  const id = String(q.id).toUpperCase().replace(/\/$/, '').trim();
+  const seg = String(event.path || '').replace(/\/+$/, '').split('/').pop() || '';
+  if(q.sitemap || /^sitemap(\.xml)?$/i.test(seg)) return sitemap();
+  const idRaw = q.id || (/^(stock|page|hub)$/i.test(seg) ? '' : seg);
+  if(q.hub || !idRaw) return hubPage();
+  const id = String(idRaw).toUpperCase().trim();
   if(!/^\d{4,6}[A-Z]?$/.test(id)) return {statusCode: 404, body: 'not found'};
   return stockPage(id);
 };
