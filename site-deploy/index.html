@@ -343,6 +343,16 @@
     .sgGrid{grid-template-columns:1fr 1fr; gap:8px;} .sgTile{padding:12px;} .sgTile .v{font-size:1.15rem;}
     .stats{grid-template-columns:1fr 1fr !important;}
   }
+  /* v2 補丁:結果頁 */
+  #resTitle{font-size:2rem; line-height:1.2; margin-bottom:6px;} #resTitle .rid{color:var(--muted); font-weight:500; font-size:1.1rem; margin-left:8px;}
+  #resTitle .rsub{display:block; color:var(--muted); font-size:.85rem; font-weight:400; margin-top:6px; letter-spacing:0;}
+  #aiBox{background:transparent; border:0; padding:0; margin-top:6px;}
+  .pill{padding:6px 12px; font-size:.85rem; margin:0 6px 6px 0;} .pill b{font-size:.95rem;}
+  table.etfT{min-width:0 !important;}
+  #aiBox [style*="border:1px solid var(--border)"]{border-color:transparent !important;}
+  @media (max-width:640px){ #resTitle{font-size:1.6rem;} }
+  [style*="rgba(88,166,255,.03)"],[style*="background:#0d1117"],[style*="background:rgba(88,166,255,.05)"]{background:var(--card2) !important; border-color:transparent !important; border-radius:18px !important;}
+  [style*="border:1px dashed var(--border)"]{border-color:var(--border) !important; border-radius:16px !important;}
 </style>
 </head>
 <body>
@@ -472,11 +482,9 @@
     <div class="card">
       <h2 class="section" id="resTitle"></h2>
       <p class="subtitle" id="eventsLine"></p>
-      <p style="margin:8px 0 0;"><button type="button" class="chip" id="shareBtn">📤 複製分享連結——朋友點開自動回測這檔</button><span id="shareOk" style="color:var(--accent); font-size:.85rem; margin-left:8px;"></span></p>
+      <p style="margin:8px 0 0;"><button type="button" class="chip" id="shareBtn">分享這檔</button><span id="shareOk" style="color:var(--accent); font-size:.85rem; margin-left:8px;"></span></p>
       <div id="aiCard" style="display:none; margin:14px 0 22px;">
-        <h2 class="section">AI 近況解析——這檔「現在」的狀態</h2>
-        <p class="subtitle">回測看歷史,這區看<b style="color:var(--text);">現在</b>——最近 5 個交易日的即時狀態、標註 K 線與短線環境判讀:</p>
-        <div id="aiBox" style="background:rgba(88,166,255,.05); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-top:10px;"></div>
+        <div id="aiBox"></div>
         <p class="subtitle" style="margin-top:10px;">此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。</p>
       </div>
       <div id="summaryBox" style="margin-bottom:18px;"></div>
@@ -588,7 +596,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261025-A';
+const APP_VER = 'v20261025-B';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -1863,7 +1871,7 @@ function xirr(flows){
 
 function render(stockId, name, data, r, mas, taiex, cmp){
   const splitMark = d => (r.lastSplit && d < r.lastSplit) ? '·分割還原價' : '';
-  $('resTitle').textContent = `${stockId} ${name} 回測結果 (${data[0].date} → ${r.sell.date},共 ${data.length} 個交易日)`;
+  $('resTitle').innerHTML = `${name || stockId} <span class="rid">${stockId}</span><span class="rsub">回測區間 ${data[0].date} → ${r.sell.date}・${data.length} 個交易日</span>`;
 
   const statRows = [
     [ // 第一行:結果最重要
