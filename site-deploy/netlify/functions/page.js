@@ -414,7 +414,8 @@ async function analyze(id){
     const ds = Object.keys(by).sort().slice(-5); if(ds.length >= 3) instNet = ds.reduce((a, d) => a + by[d], 0); }
   const nm = info && info[0] ? info[0].stock_name : '', ind = info && info[0] ? info[0].industry_category : '';
   let ck = null; try{ ck = taChecklist(s, instNet); }catch(e){}
-  return {id, nm, ind, s, ck, raw, chg: rawPrev > 0 ? (raw - rawPrev) / rawPrev * 100 : 0, date: s.length ? s[s.length - 1].date : '', instNet};
+  const n2 = s.length; const exDiv = (dv || []).some(x => s.length && x.date === s[n2 - 1].date);
+  return {id, nm, ind, s, ck, raw, exDiv, chg: n2 > 1 && s[n2 - 2].close > 0 ? (s[n2 - 1].close - s[n2 - 2].close) / s[n2 - 2].close * 100 : 0, date: s.length ? s[s.length - 1].date : '', instNet};
 }
 const CSS = `body{margin:0;background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.75}
 .w{max-width:860px;margin:0 auto;padding:18px 16px 60px}a{color:#58a6ff}h1{font-size:1.45rem;line-height:1.4;margin:6px 0}h2{font-size:1.12rem;color:#d29922;border-left:4px solid #d29922;padding-left:10px;margin:28px 0 10px}
@@ -475,7 +476,7 @@ ${etfM.fill ? `<tr><th>最近填息</th><td>${esc(etfM.fill.date)} 除息 ${etfM
   const body = `<p class="crumb"><a href="/">阿康的台股 AI 作戰室</a> › <a href="/stock/">個股與 ETF 分析</a> › ${esc(name)}</p>
 <h1>${esc(name)}(${id})${isEtf ? 'ETF' : ''}技術分析:今日訊號、停損與停利參考價</h1>
 <p class="muted">${esc(ind || (isEtf ? 'ETF' : ''))}|資料日 ${date}(收盤)|每日自動更新|作者:阿康 goodskang</p>
-<p><span class="px ${chg >= 0 ? 'up' : 'down'}">${fmt(raw)}</span> <b class="${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</b></p>
+<p><span class="px ${chg >= 0 ? 'up' : 'down'}">${fmt(raw)}</span> <b class="${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</b>${r.exDiv ? ' <span class="muted">(今日除息,漲跌已扣除股息)</span>' : ''}</p>
 <div class="card"><div class="tag">${esc(g.tag || '')}</div><p>${esc(strip(g.act))}</p><table>${rows.map(([k, v, w]) => `<tr><th>${k}</th><td>${v}<br><span class="muted">${w}</span></td></tr>`).join('')}</table>
 <p><b>💼 ${esc(strip(g.holdAct))}</b></p></div>
 <a class="cta" href="/?s=${id}">🔍 開啟 ${esc(name)} 互動分析(標註 K 線、成本試算、回測)→</a>
