@@ -164,6 +164,23 @@
   }
   .subtitle{font-size:.8rem; color:var(--muted); margin:-8px 0 14px;}
   .dxChart{background:#0d1117; border:1px solid var(--border); border-radius:10px; padding:8px 4px 4px; margin:0 0 10px;} .dxChart canvas{display:block;} .dxLg{display:flex; flex-wrap:wrap; gap:4px 12px; padding:4px 8px 0; font-size:.76rem; color:var(--muted);} .dxLg i{display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:4px;}
+  .sgc{border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin:8px 0 10px; background:rgba(255,255,255,.02);}
+  .sgc.g{border-color:var(--red); background:rgba(248,81,73,.06);} .sgc.y{border-color:var(--gold); background:rgba(210,153,34,.06);}
+  .sgc.o{border-color:#f0883e; background:rgba(240,136,62,.07);} .sgc.r{border-color:var(--green); background:rgba(63,185,80,.07);}
+  .sgh{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin-bottom:6px;} .sgt{font-size:1.25rem;} .sga{color:var(--muted); font-size:.9rem;}
+  .sgr{display:grid; grid-template-columns:6.5em 9.5em 1fr; gap:8px; padding:6px 0; border-top:1px solid var(--border); align-items:baseline; font-size:.95rem;}
+  .sgk{color:var(--muted); font-size:.85rem;} .sgv b{font-size:1.08rem;} .sgw{color:var(--muted); font-size:.8rem; line-height:1.5;}
+  .sgo{margin:8px 0 0; font-size:.92rem; font-weight:700;} .sgd{margin:6px 0 0; font-size:.76rem; color:var(--muted);}
+  @media(max-width:600px){ .sgr{grid-template-columns:5.6em 1fr;} .sgw{grid-column:1 / -1; margin-top:-4px;} }
+  .hdisc{margin-top:10px !important; font-size:.8rem !important; color:var(--gold) !important; opacity:.85;}
+  @media(max-width:600px){
+    header{margin-bottom:12px;} header .tagl{display:none;}
+    #modeBar{margin-top:8px !important;} #modeBar > p{font-size:.92rem; margin-bottom:6px !important;}
+    .modeGrid{grid-template-columns:repeat(3,1fr) !important; gap:6px !important;}
+    .modeBtn{padding:8px 4px; font-size:.88rem; line-height:1.35; border-radius:10px;}
+    .modeBtn span{font-size:.68rem; line-height:1.3;}
+    .mkt{gap:4px 6px; margin-top:8px;} .mkt .m{padding:3px 9px; font-size:.78rem;} .mkt .m .k{font-size:.7rem;}
+  }
   .mkt{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:12px auto 0; max-width:760px;}
   .mkt .m{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(88,166,255,.05); font-size:.88rem;}
   .mkt .m b{font-weight:800;} .mkt .m .k{color:var(--muted); font-size:.8rem;}
@@ -188,18 +205,18 @@
 <div class="container">
   <header>
     <h1>📈 阿康的台股 <span>AI 作戰室</span></h1>
-    <p>每檔股票都有自己的股性——短線有短線的戲,長線有長線的答案。<br>
+    <p class="tagl">每檔股票都有自己的股性——短線有短線的戲,長線有長線的答案。<br>
     今天誰在噴、這檔現在什麼狀態、長期怎麼買最划算——一站看完。</p>
     <div id="modeBar" style="margin:14px auto 0; max-width:720px;">
       <p style="color:var(--text); font-weight:700; margin:0 0 8px;">你今天的問題是哪一個?</p>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px;">
+      <div class="modeGrid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px;">
         <button type="button" class="modeBtn" data-mode="hold" onclick="setMode('hold')">💼 我有持倉<br><span>該減碼、續抱還是停損?算給我看</span></button>
         <button type="button" class="modeBtn" data-mode="one" onclick="setMode('one')">🚦 想進場<br><span>這檔現在能不能買?守哪裡?</span></button>
         <button type="button" class="modeBtn" data-mode="long" onclick="setMode('long')">🐢 想存股<br><span>定期定額還是等回檔?回測給你看</span></button>
       </div>
     </div>
     <div id="mktStrip" class="mkt" style="display:none;"></div>
-    <p style="margin-top:12px;">不報明牌、不喊進出——把數據攤開,你自己做決定。免費・免註冊。<br><span style="font-size:.82rem; opacity:.75;">本站所有內容為歷史統計與公開資料整理,非投資建議;投資有風險,損益自負。</span></p>
+    <p class="hdisc">⚠️ 此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。</p>
   </header>
 
   <div class="card" id="holdCard" style="display:none;">
@@ -300,7 +317,7 @@
         <h2 class="section">🤖 AI 近況解析——這檔「現在」的狀態</h2>
         <p class="subtitle">回測看歷史,這區看<b style="color:var(--text);">現在</b>——最近 5 個交易日的即時狀態、標註 K 線與短線環境判讀:</p>
         <div id="aiBox" style="background:rgba(88,166,255,.05); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-top:10px;"></div>
-        <p class="subtitle" style="margin-top:10px;">以上內容僅為 AI 依近期公開數據自動生成之分析,非投資建議;過去表現不代表未來,投資人應自行審慎評估風險,投資後果自負。</p>
+        <p class="subtitle" style="margin-top:10px;">此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。</p>
       </div>
       <div id="summaryBox" style="margin-bottom:18px;"></div>
       <div id="statsGrid"></div>
@@ -386,7 +403,7 @@
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
     版本 v20261024-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
-    本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
+    此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。
   </footer>
 </div>
 <button type="button" id="fab">🔍 測別檔股票</button>
@@ -406,7 +423,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-A';
+const APP_VER = 'v20261024-B';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -2030,6 +2047,7 @@ async function runHold(){
       + `<span class="pill">五燈 ${ck.score}/${ck.nItems} ${light}</span>`
       + (ck.brokeStop ? `<span class="pill">⛔ <b class="down">已跌破防守 ${fmt(ck.lastLow)}</b></span>` : ck.breakdown ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>` : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ck.lastLow)}</b></span>`)
       + (ck.nh40 ? `<span class="pill" style="border-color:var(--red);">🚀 <b class="up">創新高帶量</b></span>` : '') + `</div>`
+      + sigCardHtml(ck.sig)
       + `<div style="${sub}"><p style="font-weight:700; margin:0 0 4px; font-size:.92rem;">📦 部位與風險</p><div id="hPos" class="hint" style="line-height:1.75;"></div></div>`
       + `<div style="${sub}"><p style="font-weight:700; margin:0 0 4px; font-size:.92rem;">📋 交易計畫卡</p><div id="hDx" class="hint" style="line-height:1.75;">⏳ 抓三年還原價,統計中…</div></div>`
       + `<p style="margin:10px 0 0; font-size:.88rem;"><a href="javascript:void(0)" onclick="quickRun('${id} ${nm.replace(/[<>'"]/g, '')}')" style="color:var(--accent);">🔎 看這檔的完整五燈檢查表、標註 K 線與回測 →</a></p>`;
@@ -2560,7 +2578,7 @@ async function runDiag(o){
     }
     if(advice.expect) L.push(`📈 <b>期待</b>:${advice.expect}`);
     body += `<div class="dxDo"><div class="h">🧭 技術上的好操作</div>${L.map(x => `<div>${x}</div>`).join('')}</div>`;
-    const html = body + `<div class="dxDisc">⚠️ 歷史統計非預測;樣本為此股自身近三年價量,與使用 AI 與技術線圖提供之資訊。非正式投資建議,損益自負。</div>`;
+    const html = body + `<div class="dxDisc">⚠️ 此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。</div>`;
     out.innerHTML = html;
     // 📈 計畫卡的圖:近 60 日還原 K + 月線/季線 + 成本/防守/鎖利/停利線 + 底部劇本色帶
     try{
@@ -3565,7 +3583,76 @@ function taChecklist(s, instNet){
   }else{
     entry = `盤整區間,順勢者的劇本:<b>收盤帶量突破前波頭 ${fmt(neck)}</b>(距現價 ${last.close < neck ? '+' + ((neck - last.close) / last.close * 100).toFixed(1) + '%' : '門口'})才有進場理由;區間裡殺進殺出,多數時候是幫券商打工`;
   }
-  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop};
+  // 🎯 規則化價位與動作標籤(演算法依當下數據輸出,非人為買賣建議)
+  let sig = null;
+  try{
+    const px = last.close, broke = brokeStop || farNote === 'BREAK';
+    const stopP = broke ? 0 : (altStop > 0 ? altStop : lastLow);
+    const risk = stopP > 0 ? px - stopP : 0;
+    // 停利參考①:現價之上最近的波段高點(上檔第一個套牢區);沒有就看近 120 日最高;再沒有(創新高)用 1:2 風險報酬推算
+    const hAbove = pvAll.filter(p => p.t === 'H' && p.p > px * 1.01).map(p => p.p);
+    const hi120 = Math.max(...s.slice(Math.max(0, n - 120), n - 1).map(b => b.max));
+    let tp1 = 0, tp1Why = '';
+    if(hAbove.length){ tp1 = Math.min(...hAbove); tp1Why = '上方最近的波段高點(前波套牢區)'; }
+    else if(hi120 > px * 1.01){ tp1 = hi120; tp1Why = '近半年最高價'; }
+    else if(risk > 0){ tp1 = px + risk * 2; tp1Why = '上方無前高,以「風險 ×2」推算'; }
+    // 停利參考②:等幅測距——前一段上漲波的幅度,從最近的底往上量
+    let tp2 = 0, tp2Why = '';
+    {
+      let hI = -1; for(let k = pvAll.length - 1; k >= 1; k--){ if(pvAll[k].t === 'H' && pvAll[k-1].t === 'L'){ hI = k; break; } }
+      const baseL = LsC.length ? LsC[LsC.length - 1].p : 0;
+      if(hI >= 1 && baseL > 0){
+        const mm = baseL + (pvAll[hI].p - pvAll[hI-1].p);
+        if(mm > Math.max(tp1, px) * 1.02){ tp2 = mm; tp2Why = `等幅測距:前一段上漲波 ${fmt(pvAll[hI-1].p)}→${fmt(pvAll[hI].p)} 的幅度,從最近的底 ${fmt(baseL)} 往上量`; }
+      }
+      if(!tp2 && risk > 0 && tp1 > 0){ const r3 = px + risk * 3; if(r3 > tp1 * 1.02){ tp2 = r3; tp2Why = '以「風險 ×3」推算'; } }
+    }
+    const lo = Math.max(stopP * 1.005, Math.min(px, ma20));
+    let tag, cls2, act, zone = '', zoneWhy = '', holdAct;
+    if(broke){
+      tag = '🔴 停損訊號'; cls2 = 'r';
+      act = brokeStop ? `收盤 ${fmt(px)} 已跌破防守 ${fmt(lastLow)},原本的買進依據失效` : `收盤已跌破近期所有低點,近距離沒有支撐`;
+      zone = ''; zoneWhy = brokeStop ? `收復 ${fmt(lastLow)} 或站回月線 ${fmt(ma20)} 才重新評估` : `收盤站回月線 ${fmt(ma20)} 且月線上彎才重新評估`;
+      holdAct = '持有者:停損條件已觸發(不攤平、不把停損往下移)';
+    }else if(trend === '空頭' || phase === '作頭'){
+      tag = '🟠 減碼訊號'; cls2 = 'o';
+      act = trend === '空頭' ? '頭頭低、底底低的空頭結構,做多不在順勢框架內' : '頭頭低的作頭結構,反彈先看壓力';
+      zoneWhy = `收盤站回月線 ${fmt(ma20)} 且月線上彎才轉為可進場`;
+      holdAct = `持有者:反彈到月線 ${fmt(ma20)} 附近是減碼參考;跌破 ${fmt(lastLow)} 出場`;
+    }else if((buyOK || verdict.includes('友善') || verdict.includes('買點浮現')) && dMa < 5 && risk > 0){
+      tag = '🟢 可進場區'; cls2 = 'g';
+      act = buyOK ? '「回後買上漲」樣態成立,防守就在附近' : '趨勢與燈號條件多數成立';
+      zone = `${fmt(lo)} – ${fmt(px)}`; zoneWhy = '月線(或防守)到現價之間';
+      holdAct = `持有者:續抱,停損 ${fmt(stopP)}${tp1 ? `、到 ${fmt(tp1)} 附近可分批停利` : ''}`;
+    }else{
+      tag = '🟡 觀望・等條件'; cls2 = 'y';
+      if(trend === '多頭' && dMa >= 5){ act = `乖離月線 +${dMa.toFixed(1)}%,現價進場等於追高`; zone = `${fmt(ma20)} – ${fmt(ma20 * 1.02)}`; zoneWhy = '拉回月線附近止跌收紅'; }
+      else if(trend === '多頭' && !above){ act = '多頭結構但收盤跌破月線,回檔中'; zoneWhy = `收盤站回月線 ${fmt(ma20)} 才轉為可進場`; }
+      else if(trend === '轉多'){ act = '剛突破頸線,突破當天不追'; zone = `${fmt(neck)} – ${fmt(neck * 1.02)}`; zoneWhy = '回測頸線不破、收紅上漲'; }
+      else if(trend === '多頭'){ act = '多頭延伸,但買點條件未齊'; zone = `${fmt(ma20)} – ${fmt(Math.min(px, ma20 * 1.02))}`; zoneWhy = '拉回月線不破+收紅'; }
+      else { act = phase === '打底' ? '打底轉強中,還沒過頸線' : '盤整區間,方向未定'; zoneWhy = `收盤帶量站上 ${fmt(neck)}(${neck > px ? '+' + ((neck - px) / px * 100).toFixed(1) + '%' : '門口'})才轉為可進場`; }
+      holdAct = `持有者:續抱,跌破 ${fmt(stopP)} 出場${tp1 ? `;到 ${fmt(tp1)} 附近可分批停利` : ''}`;
+    }
+    if(!broke && dMa >= 15) holdAct = `持有者:乖離月線 +${dMa.toFixed(1)}% 偏熱,可先分批停利;停損上移到 ${fmt(stopP)}`;
+    const rr = (risk > 0 && tp1 > px) ? (tp1 - px) / risk : 0;
+    sig = {tag, cls: cls2, act, zone, zoneWhy, holdAct, stop: stopP, stopPct: stopP > 0 ? (stopP - px) / px * 100 : 0,
+      tp1: broke ? 0 : tp1, tp1Why, tp1Pct: tp1 > 0 ? (tp1 - px) / px * 100 : 0, tp2: broke ? 0 : tp2, tp2Why, tp2Pct: tp2 > 0 ? (tp2 - px) / px * 100 : 0, rr, px};
+  }catch(e){ sig = null; }
+  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
+}
+const SIG_DISC = '此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負';
+function sigCardHtml(g){
+  if(!g) return '';
+  const pc = v => `<span style="opacity:.75; font-size:.85em;">(${v >= 0 ? '+' : ''}${v.toFixed(1)}%)</span>`;
+  const row = (k, v, why, col) => `<div class="sgr"><span class="sgk">${k}</span><span class="sgv"${col ? ` style="color:${col};"` : ''}>${v}</span><span class="sgw">${why}</span></div>`;
+  let h = `<div class="sgc ${g.cls}"><div class="sgh"><b class="sgt">${g.tag}</b><span class="sga">${g.act}</span></div>`;
+  h += row('進場參考', g.zone ? `<b>${g.zone}</b>` : '<b>暫不進場</b>', g.zoneWhy);
+  if(g.stop > 0) h += row('停損參考', `<b>${fmt(g.stop)}</b> ${pc(g.stopPct)}`, '收盤跌破即出場', 'var(--green)');
+  if(g.tp1 > 0) h += row('停利參考①', `<b>${fmt(g.tp1)}</b> ${pc(g.tp1Pct)}`, g.tp1Why, 'var(--red)');
+  if(g.tp2 > 0) h += row('停利參考②', `<b>${fmt(g.tp2)}</b> ${pc(g.tp2Pct)}`, g.tp2Why, 'var(--red)');
+  if(g.rr > 0) h += row('報酬風險比', `<b>${g.rr.toFixed(1)} : 1</b>`, g.rr >= 2 ? '賺賠比合格(≥2)' : g.rr >= 1 ? '賺賠比普通,部位縮小' : '賺的空間小於賠的空間');
+  h += `<p class="sgo">💼 ${g.holdAct}</p><p class="sgd">⚠️ ${SIG_DISC}。價位依頭底結構、月線與前高自動計算。</p></div>`;
+  return h;
 }
 
 // 🕯 手刻 K 線圖:近 60 日蠟燭+月線+頭底轉折圈+防守位虛線——跟檢查表同一套數據,看圖對答案
@@ -4128,7 +4215,7 @@ async function renderAiInsight(stockId, name){
           + `</div>`;
       }
     }catch(e){}
-    box.innerHTML = `<div style="margin-bottom:2px;">${pills}<span id="pePill"></span></div><div id="peBox"></div>` + newsHtml + dayHtml + chartHtml
+    box.innerHTML = `<div style="margin-bottom:2px;">${pills}<span id="pePill"></span></div>` + (ckObj ? sigCardHtml(ckObj.sig) : '') + `<div id="peBox"></div>` + newsHtml + dayHtml + chartHtml
       + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`;
     try{ if(ckObj) drawKChart($('kchart'), s.slice(-45), ckObj); }catch(e){}
     try{ posTab(localStorage.getItem('posMode') || 'A'); }catch(e){}
