@@ -197,7 +197,7 @@
   .etfAdd{font-size:.85rem; color:var(--muted); margin-bottom:10px;} .etfAdd input{width:110px; padding:6px 8px; margin:0 6px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);}
   .etfAdd button{padding:6px 12px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); cursor:pointer;}
   .etfT{width:100%; border-collapse:collapse; font-size:.9rem;} .etfT th{color:var(--muted); font-weight:400; font-size:.78rem; text-align:right; padding:6px 6px; border-bottom:1px solid var(--border); white-space:nowrap;}
-  .etfT td{padding:9px 6px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;} .etfT td:first-child,.etfT th:first-child{text-align:left;}
+  .etfT td{padding:9px 5px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;} .etfT td:first-child,.etfT th:first-child{text-align:left;}
   .etfT tr.r:hover{background:rgba(88,166,255,.05);} .etfT .nm b{font-size:.98rem;} .etfT .nm span{display:block; color:var(--muted); font-size:.74rem;}
   .etfT .sg{font-size:.78rem; font-weight:700;} .etfT .go{padding:5px 10px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.1); color:var(--accent); cursor:pointer; font-size:.8rem;}
   .etfT .sub{color:var(--muted); font-size:.72rem;}
@@ -466,7 +466,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-P';
+const APP_VER = 'v20261024-Q';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -2144,14 +2144,13 @@ function renderEtf(){
   const rows = ETF.filter(x => etfCat === '全部' || x.cat === etfCat).slice().sort((a, b) => val(b) - val(a));
   const P = v => v == null ? '<span class="sub">未滿期</span>' : `<b class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%</b>`;
   const md = s => s ? s.slice(2, 7).replace('-', '/') : '';
-  box.innerHTML = `<div class="etfWrap"><table class="etfT"><thead><tr><th>ETF</th><th>今日成交量<br>(張)</th><th>現價</th><th>近 1 年<br>含息</th><th>近 3 年含息<br>(年化)</th><th>3 年內<br>最大回檔</th><th>殖利率<br>最近填息</th><th>每月存 1 萬<br>存 3 年</th><th style="text-align:left;">存股訊號</th></tr></thead><tbody>`
+  box.innerHTML = `<div class="etfWrap"><table class="etfT"><thead><tr><th>ETF</th><th>今日成交量<br>(張)</th><th>近 1 年<br>含息</th><th>近 3 年含息<br>(年化)</th><th>3 年內<br>最大回檔</th><th>殖利率<br>最近填息</th><th>每月存 1 萬<br>存 3 年</th><th style="text-align:left;">存股訊號</th></tr></thead><tbody>`
     + rows.map(x => {
       const [sg, sc, sw] = etfSig(x);
       const fill = !x.fill ? '' : x.fill.filled ? `<br><span class="sub">✅ ${md(x.fill.date)} 除息 ${x.fill.amt},${x.fill.days} 天填息</span>` : `<br><span class="sub">⏳ ${md(x.fill.date)} 除息 ${x.fill.amt},已 ${x.fill.days} 天未填</span>`;
       const dca = x.dca ? `${P(x.dca.ret)}<br><span class="sub">${Math.round(x.dca.invested / 1e4)} 萬→${(x.dca.value / 1e4).toFixed(1)} 萬${x.has3 ? '' : '(成立以來)'}</span>` : '';
-      return `<tr class="r"><td class="nm"><b>${x.name || x.id}</b> <span>${x.id}・${x.cat}・${x.freq}${x.has3 || !x.since ? '' : `・${x.since.slice(0, 7).replace('-', '/')} 起`}</span></td>`
+      return `<tr class="r"><td class="nm"><b>${x.name || x.id}</b> <span>現價 <b style="color:var(--text); font-size:.8rem;">${fmt(x.price)}</b>・${x.id}・${x.cat}・${x.freq}${x.has3 || !x.since ? '' : `・${x.since.slice(0, 7).replace('-', '/')} 起`}</span></td>`
         + `<td data-k="今日成交量(張)">${x.hot ? `<b>${x.hot.lots.toLocaleString('zh-TW')}</b><br><span class="sub">#${x.hot.rank}・${(x.hot.val / 1e8).toFixed(1)} 億</span>` : '<span class="sub">—</span>'}</td>`
-        + `<td data-k="現價">${fmt(x.price)}</td>`
         + `<td data-k="近 1 年含息">${P(x.r1)}</td>`
         + `<td data-k="近 3 年含息(年化)">${x.r3 == null ? P(null) : `${P(x.r3)}<br><span class="sub">年化 ${(x.r3a * 100).toFixed(1)}%</span>`}</td>`
         + `<td data-k="3 年內最大回檔">${x.mini ? P(null) : P(x.mdd3)}${x.mini ? '' : `<br><span class="sub">${md(x.mdd3Peak)}→${md(x.mdd3Trough)}</span>`}</td>`
