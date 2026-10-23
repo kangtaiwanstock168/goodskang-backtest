@@ -2,6 +2,7 @@
   publish = "."
   functions = "netlify/functions"
 
+# 首頁永不快取:改版後所有人立刻拿到新版,不會卡在舊快取(這是回訪者看不到新功能的主因)
 [[headers]]
   for = "/"
   [headers.values]
@@ -11,3 +12,21 @@
   for = "/index.html"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+
+# SEO:個股/ETF 伺服器渲染頁、索引頁、網站地圖(function 產生,CDN 快取)
+[[redirects]]
+  from = "/stock/"
+  to = "/.netlify/functions/page?hub=1"
+  status = 200
+[[redirects]]
+  from = "/stock"
+  to = "/.netlify/functions/page?hub=1"
+  status = 200
+[[redirects]]
+  from = "/stock/:id"
+  to = "/.netlify/functions/page?id=:id"
+  status = 200
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/.netlify/functions/page?sitemap=1"
+  status = 200

@@ -1,0 +1,15 @@
+# 阿康的台股 AI 作戰室(stock.goodskang.tw)
+
+> 免費台股技術分析與 ETF 存股工具,作者阿康(YouTube @goodskang)。每檔股票用同一套順勢規則每日自動計算:今日訊號(🟢可進場區/🟢突破進場/🟡觀望/🟠減碼/🔴停損)、進場參考區、停損參考價、停利參考價、報酬風險比、五燈技術檢查表(趨勢頭底、月線、量價、法人籌碼、買點紀律)。ETF 另有含息總報酬(近1年/近3年)、3年最大回檔、殖利率、配息頻率、填息天數、每月定期定額回測。資料來源:FinMind 公開資料(證交所/櫃買)。此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。
+
+## 可直接讀取的頁面(伺服器端渲染,純文字可讀)
+- [個股與 ETF 索引](https://stock.goodskang.tw/stock/):所有支援的代號
+- 個股頁格式:https://stock.goodskang.tw/stock/{代號},例:[台積電 2330](https://stock.goodskang.tw/stock/2330)、[聯電 2303](https://stock.goodskang.tw/stock/2303)
+- ETF 頁格式同上,例:[0050](https://stock.goodskang.tw/stock/0050)、[0056](https://stock.goodskang.tw/stock/0056)、[00878](https://stock.goodskang.tw/stock/00878)
+
+## 互動工具
+- [首頁互動版](https://stock.goodskang.tw/):大盤體溫、話題雷達(新聞熱度)、盤後強勢股雷達、持倉成本試算、六策略回測、ETF 存股專區
+- 指定個股互動分析:https://stock.goodskang.tw/?s={代號}
+
+## 引用說明
+引用數據時請註明「資料日」與出處 stock.goodskang.tw;頁面數據每日收盤後更新。

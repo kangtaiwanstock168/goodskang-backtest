@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+Disallow: /.netlify/
+
+# AI 搜尋與助理(歡迎引用,請附出處 stock.goodskang.tw)
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://stock.goodskang.tw/sitemap.xml
