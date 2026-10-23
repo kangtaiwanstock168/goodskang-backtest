@@ -353,6 +353,9 @@
   @media (max-width:640px){ #resTitle{font-size:1.6rem;} }
   [style*="rgba(88,166,255,.03)"],[style*="background:#0d1117"],[style*="background:rgba(88,166,255,.05)"]{background:var(--card2) !important; border-color:transparent !important; border-radius:18px !important;}
   [style*="border:1px dashed var(--border)"]{border-color:var(--border) !important; border-radius:16px !important;}
+  .sigb{border-top:1px solid var(--border) !important;}
+  .chipL{display:inline-block; color:var(--muted); font-size:.82rem; margin-right:6px;}
+  #fab{background:rgba(44,44,46,.85); color:var(--text); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 6px 20px rgba(0,0,0,.5); font-weight:600; border-radius:999px; padding:12px 18px;}
 </style>
 </head>
 <body>
@@ -433,8 +436,8 @@
       <div style="flex:1 1 240px;"><label>股票代號 / 名稱</label><div class="combo"><input type="text" id="stockId" value="2330 台積電" placeholder="例:2330 或 台積電" autocomplete="off"><div id="suggest" class="suggest"></div></div></div>
       <div style="flex:0 1 200px; min-width:160px;"><button id="runBtnTop" onclick="run()">🚀 開始分析</button></div>
     </div>
-    <p class="hint" style="margin-top:8px;">⚡ <b style="color:var(--text);">打完代號(或名稱)直接按——短線動能、五燈檢查表、標註 K 線馬上出來</b>,日期金額全都有預設,不用填。</p>
-    <p id="quickChips" style="margin-top:10px; font-size:.85rem; color:var(--muted);">🔥 熱門快選(點了直接分析):
+    <p class="hint" style="margin-top:8px;">輸入代號或名稱,按「開始分析」。日期與金額都有預設,不用填。</p>
+    <p id="quickChips" style="margin-top:10px; font-size:.85rem; color:var(--muted);"><span class="chipL">熱門</span>
       <button type="button" class="chip" onclick="quickRun('2330 台積電')">台積電</button>
       <button type="button" class="chip" onclick="quickRun('2317 鴻海')">鴻海</button>
       <button type="button" class="chip" onclick="quickRun('2454 聯發科')">聯發科</button>
@@ -596,7 +599,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261025-B';
+const APP_VER = 'v20261025-C';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -1012,7 +1015,7 @@ async function fetchEvents(stockId, start, end){
       label:`${s.date} 股票分割 1拆${Math.round(s.before_price/s.after_price)}(${s.before_price} → ${s.after_price})`});
   for(const d of divs) if(d.before_price > 0 && d.after_price > 0)
     events.push({date:d.date, factor:d.after_price/d.before_price,
-      label:`${d.date} 除${d.stock_or_cache_dividend || '息'} ${d.stock_and_cache_dividend} 元`});
+      label:`${d.date} 除${d.stock_or_cache_dividend || '息'} ${+Number(d.stock_and_cache_dividend).toFixed(4)} 元`});
   events.sort((a,b) => a.date.localeCompare(b.date));
   return events;
 }
@@ -2168,7 +2171,7 @@ function fillSigBadges(box){
           if(!g){ b.textContent = '資料不足,點進去看'; b.className = 'sigb n'; }
           else {
             const kv = g.cls === 'g' ? `進場 ${g.zone}・停損 ${fmt(g.stop)}`
-              : g.cls === 'y' ? (g.zone ? `等拉回 ${g.zone}` : '等條件成立')
+              : g.cls === 'y' ? (g.zone ? `等拉回 ${g.zone}` : String(g.zoneWhy || '等條件成立').replace(/才轉為可進場$/, '').slice(0, 22))
               : g.cls === 'o' ? (g.stop > 0 ? `持有者跌破 ${fmt(g.stop)} 出場` : '持有者減碼')
               : '空手不進場';
             b.innerHTML = `<b>${g.tag}</b><span>${kv}</span>`; b.className = 'sigb ' + g.cls;
@@ -2344,7 +2347,7 @@ function renderHotChips(hot){
   const qc = $('quickChips');
   if(qc){
     const dyn = list.slice(2, 10);   // 0050、正2 固定在前,其餘跟著雷達走
-    qc.innerHTML = '🔥 熱門快選(點了直接分析):' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join(''); try{ colorChips(); }catch(e){}
+    qc.innerHTML = '<span class="chipL">熱門</span>' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join(''); try{ colorChips(); }catch(e){}
   }
 }
 function hPick(v){ const hs = $('hStock'); if(!hs) return; hs.value = v; $('suggest3').style.display = 'none'; $('hCost').focus(); }
@@ -3190,7 +3193,7 @@ function renderWatch(){
   const row = $('watchRow'), list = loadWatch().map(w => (typeof w === 'string') ? {id: w} : w).filter(w => w && w.id);
   if(!list.length){ row.style.display = 'none'; return; }
   row.style.display = 'block';
-  row.innerHTML = '📌 你查過的(點了就重測今天最新):' + list.map(w => {
+  row.innerHTML = '<span class="chipL">你查過的</span>' + list.slice(0, 6).map(w => {
     const label = String(w.name || w.id).replace(/[<>'"]/g, '');
     return `<button type="button" class="chip" onclick="quickRun('${w.id} ${label}')">${label}</button>`;
   }).join('');
