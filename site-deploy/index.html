@@ -423,7 +423,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-C';
+const APP_VER = 'v20261024-D';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -3630,7 +3630,7 @@ function taChecklist(s, instNet){
       tag = '🟠 減碼訊號'; cls2 = 'o';
       act = trend === '空頭' ? '頭頭低、底底低的空頭結構,做多不在順勢框架內' : '頭頭低的作頭結構,反彈先看壓力';
       zoneWhy = `收盤站回月線 ${fmt(ma20)} 且月線上彎才轉為可進場`;
-      holdAct = `持有者:反彈到月線 ${fmt(ma20)} 附近是減碼參考;跌破 ${fmt(lastLow)} 出場`;
+      holdAct = `持有者:反彈到月線 ${fmt(ma20)} 附近是減碼參考;跌破 ${fmt(stopP)} 出場`;
     }else if((buyOK || verdict.includes('友善') || verdict.includes('買點浮現')) && dMa < 5 && risk > 0){
       tag = '🟢 可進場區'; cls2 = 'g';
       act = buyOK ? '「回後買上漲」樣態成立,防守就在附近' : '趨勢與燈號條件多數成立';
@@ -3660,9 +3660,12 @@ function sigCardHtml(g){
   let h = `<div class="sgc ${g.cls}"><div class="sgh"><b class="sgt">${g.tag}</b><span class="sga">${g.act}</span></div>`;
   h += row('進場參考', g.zone ? `<b>${g.zone}</b>` : '<b>暫不進場</b>', g.zoneWhy);
   if(g.stop > 0) h += row('停損參考', `<b>${fmt(g.stop)}</b> ${pc(g.stopPct)}`, g.stopWhy || '收盤跌破即出場', 'var(--green)');
-  if(g.tp1 > 0) h += row('停利參考①', `<b>${fmt(g.tp1)}</b> ${pc(g.tp1Pct)}`, g.tp1Why, 'var(--red)');
-  if(g.tp2 > 0) h += row('停利參考②', `<b>${fmt(g.tp2)}</b> ${pc(g.tp2Pct)}`, g.tp2Why, 'var(--red)');
-  if(g.rr > 0) h += row('報酬風險比', `<b>${g.rr.toFixed(1)} : 1</b>`, g.rr >= 2 ? '賺賠比合格(≥2)' : g.rr >= 1 ? '賺賠比普通,部位縮小' : '賺的空間小於賠的空間');
+  if(g.cls === 'o'){ if(g.tp1 > 0) h += row('反彈壓力', `<b>${fmt(g.tp1)}</b> ${pc(g.tp1Pct)}`, g.tp1Why + ',持有者反彈到這裡可減碼', 'var(--red)'); }
+  else {
+    if(g.tp1 > 0) h += row('停利參考①', `<b>${fmt(g.tp1)}</b> ${pc(g.tp1Pct)}`, g.tp1Why, 'var(--red)');
+    if(g.tp2 > 0) h += row('停利參考②', `<b>${fmt(g.tp2)}</b> ${pc(g.tp2Pct)}`, g.tp2Why, 'var(--red)');
+  }
+  if(g.rr > 0 && g.zone) h += row('報酬風險比', `<b>${g.rr.toFixed(1)} : 1</b>`, g.rr >= 2 ? '賺賠比合格(≥2)' : g.rr >= 1 ? '賺賠比普通,部位縮小' : '賺的空間小於賠的空間');
   h += `<p class="sgo">💼 ${g.holdAct}</p><p class="sgd">⚠️ ${SIG_DISC}。價位依頭底結構、月線與前高自動計算。</p></div>`;
   return h;
 }
