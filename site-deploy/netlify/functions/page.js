@@ -517,6 +517,18 @@ exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   const seg = String(event.path || '').replace(/\/+$/, '').split('/').pop() || '';
   if(q.sitemap || /^sitemap(\.xml)?$/i.test(seg)) return sitemap();
+  // /sig/:id → 雷達卡徽章用的精簡訊號(JSON),CDN 快取 6 小時:全站共用一份,手機不用自己抓 5 支 API 算
+  if(/\/sig\/[^/]+$/.test(String(event.path || '')) || q.sig){
+    const id = String(q.sig || seg).toUpperCase().trim();
+    if(!/^\d{4,6}[A-Z]?$/.test(id)) return {statusCode: 400, body: '{}'};
+    const r = await analyze(id);
+    const hdr = {'content-type': 'application/json', 'cache-control': 'public, max-age=900'};
+    if(r.err || !r.ck || !r.ck.sig) return {statusCode: 200, headers: Object.assign(hdr, {'netlify-cdn-cache-control': 'public, s-maxage=1800'}), body: JSON.stringify({id, none: 1})};
+    const g = r.ck.sig;
+    const lite = {id, date: r.date, cls: g.cls, tag: g.tag, act: strip(g.act), zone: g.zone, zoneWhy: strip(g.zoneWhy), stop: g.stop, stopPct: g.stopPct, stopWhy: g.stopWhy,
+      tp1: g.tp1, tp1Pct: g.tp1Pct, tp1Why: g.tp1Why, tp2: g.tp2, tp2Pct: g.tp2Pct, tp2Why: g.tp2Why, rr: g.rr, px: g.px, holdAct: strip(g.holdAct), score: r.ck.score, nItems: r.ck.nItems, verdict: strip(r.ck.verdict), d5: r.s.length > 6 ? (r.s[r.s.length - 1].close / r.s[r.s.length - 6].close - 1) * 100 : null};
+    return {statusCode: 200, headers: Object.assign(hdr, {'netlify-cdn-cache-control': 'public, s-maxage=21600, stale-while-revalidate=86400, durable'}), body: JSON.stringify(lite)};
+  }
   const idRaw = q.id || (/^(stock|page|hub)$/i.test(seg) ? '' : seg);
   if(q.hub || !idRaw) return hubPage();
   const id = String(idRaw).toUpperCase().trim();
