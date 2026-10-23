@@ -197,7 +197,7 @@
   .etfAdd{font-size:.85rem; color:var(--muted); margin-bottom:10px;} .etfAdd input{width:110px; padding:6px 8px; margin:0 6px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);}
   .etfAdd button{padding:6px 12px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.12); color:var(--accent); cursor:pointer;}
   .etfT{width:100%; border-collapse:collapse; font-size:.9rem;} .etfT th{color:var(--muted); font-weight:400; font-size:.78rem; text-align:right; padding:6px 6px; border-bottom:1px solid var(--border); white-space:nowrap;}
-  .etfT td{padding:9px 5px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;} .etfT td:first-child,.etfT th:first-child{text-align:left;}
+  .etfT td{padding:9px 5px; border-bottom:1px solid var(--border); text-align:right; white-space:normal; min-width:64px;} .etfT td b{white-space:nowrap;} .etfT td.nm{min-width:150px; max-width:190px;} .etfT td:first-child,.etfT th:first-child{text-align:left;}
   .etfT tr.r:hover{background:rgba(88,166,255,.05);} .etfT .nm b{font-size:.98rem;} .etfT .nm span{display:block; color:var(--muted); font-size:.74rem;}
   .etfT .sg{font-size:.78rem; font-weight:700;} .etfT .go{padding:5px 10px; border-radius:6px; border:1px solid var(--accent); background:rgba(88,166,255,.1); color:var(--accent); cursor:pointer; font-size:.8rem;}
   .etfT .sub{color:var(--muted); font-size:.72rem;}
@@ -466,7 +466,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-Q';
+const APP_VER = 'v20261024-R';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
