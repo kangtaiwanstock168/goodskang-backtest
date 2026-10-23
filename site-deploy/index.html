@@ -603,7 +603,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261025-D';
+const APP_VER = 'v20261025-E';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -2396,7 +2396,7 @@ async function runHold(){
     let ck = null; try{ ck = taChecklist(s, R.instNet); }catch(e){}
     if(!ck){ out.innerHTML = '<span class="down">檢查表計算失敗,請稍後再試。</span>'; return; }
     const d = {id, nm, date: R.end, p: lastC, price: fmt(lastC), pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ck.verdict, items: ck.items,
-      stop: ck.lastLow, brokeStop: !!ck.brokeStop, amp: ck.amp10, altStop: ck.altStop, nh40: !!ck.nh40, score: ck.score, nItems: ck.nItems};
+      stop: ck.stopUse, brokeStop: !!ck.brokeStop, amp: ck.amp10, altStop: ck.altStop, nh40: !!ck.nh40, score: ck.score, nItems: ck.nItems};
     const light = ck.verdict.includes('不利') ? '<b class="down">不利 🔴</b>' : ck.verdict.includes('友善') ? '<b class="up">友善 🟢</b>' : ck.verdict.includes('買點浮現') ? '<b class="up">買點浮現 🟢</b>'
       : ck.verdict.includes('爆出漲停') ? '<b class="up">攻擊發起 🟠</b>' : ck.verdict.includes('醞釀') ? '<b style="color:var(--gold);">醞釀 🟡</b>' : ck.verdict.includes('作頭') ? '<b class="down">警戒 🟠</b>' : '<b style="color:var(--gold);">中性 🟡</b>';
     const lastBar = s[s.length - 1];
@@ -2404,7 +2404,7 @@ async function runHold(){
     const sub = 'background:rgba(88,166,255,.03); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-top:8px;';
     out.innerHTML = `<div style="margin-bottom:4px;"><span class="pill"><b>${d.nm}</b> ${fmt(lastC)} <b class="${cls(d.pct)}">${pct(d.pct)}</b> <span style="opacity:.7;">(${whenTxt})</span></span>`
       + `<span class="pill">五燈 ${ck.score}/${ck.nItems} ${light}</span>`
-      + (ck.brokeStop ? `<span class="pill">⛔ <b class="down">已跌破防守 ${fmt(ck.lastLow)}</b></span>` : ck.breakdown ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>` : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ck.lastLow)}</b></span>`)
+      + (ck.brokeStop ? `<span class="pill">⛔ <b class="down">已跌破防守 ${fmt(ck.lastLow)}</b></span>` : ck.breakdown ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>` : `<span class="pill">停損參考 <b style="color:var(--accent);">${fmt(ck.stopUse)}</b></span>`)
       + (ck.nh40 ? `<span class="pill" style="border-color:var(--red);">🚀 <b class="up">創新高帶量</b></span>` : '') + `</div>`
       + sigCardHtml(ck.sig)
       + `<div style="${sub}"><p style="font-weight:700; margin:0 0 4px; font-size:.92rem;">📦 部位與風險</p><div id="hPos" class="hint" style="line-height:1.75;"></div></div>`
@@ -4027,7 +4027,9 @@ function taChecklist(s, instNet){
     sig = {tag, cls: cls2, act, zone, zoneWhy, holdAct, stopWhy, stop: stopP, stopPct: stopP > 0 ? (stopP - px) / px * 100 : 0,
       tp1: broke ? 0 : tp1, tp1Why, tp1Pct: tp1 > 0 ? (tp1 - px) / px * 100 : 0, tp2: broke ? 0 : tp2, tp2Why, tp2Pct: tp2 > 0 ? (tp2 - px) / px * 100 : 0, rr, px};
   }catch(e){ sig = null; }
-  return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
+  // 對外顯示的防守價統一用訊號卡的停損參考(已做最小距離與升降單位調整),避免膠囊/K 線/計畫卡出現兩個不同的防守數字
+  const stopUse = (sig && sig.stop > 0) ? sig.stop : lastLow;
+  return {stopUse, items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
 }
 const SIG_DISC = '此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負';
 // 💼 訊號卡內嵌持倉試算:只填成本,不用切模式、不用填張數——損益、到停損/停利各是多少%、現在該做什麼
@@ -4149,7 +4151,8 @@ function drawKChart(canvas, bars, ck){
   // 上欄價格(~72%)、下欄成交量(~24%),中間留縫
   const padL = 6, padR = 62, padT = 16, n = bars.length;
   const pBot = Math.round(H * 0.70), vTop = pBot + 14, vBot = H - 8;
-  let lo = Math.min(...bars.map(b => b.min), ck.lastLow), hi = Math.max(...bars.map(b => b.max), ck.ma20);
+  const SL = ck.brokeStop ? ck.lastLow : (ck.stopUse || ck.lastLow);
+  let lo = Math.min(...bars.map(b => b.min), SL), hi = Math.max(...bars.map(b => b.max), ck.ma20);
   const rng0 = (hi - lo) || 1; lo -= rng0 * 0.05; hi += rng0 * 0.05;
   const y = v => padT + (hi - v) / (hi - lo) * (pBot - padT);
   const x = i => padL + (i + 0.5) * (W - padL - padR) / n;
@@ -4197,11 +4200,11 @@ function drawKChart(canvas, bars, ck){
   g.stroke(); g.lineWidth = 1;
   // 防守位虛線(前波低)
   g.setLineDash([5, 4]); g.strokeStyle = ACC;
-  g.beginPath(); g.moveTo(padL, y(ck.lastLow)); g.lineTo(W - padR, y(ck.lastLow)); g.stroke();
+  g.beginPath(); g.moveTo(padL, y(SL)); g.lineTo(W - padR, y(SL)); g.stroke();
   g.setLineDash([]);
-  let defY = Math.min(pBot - 6, Math.max(10, y(ck.lastLow)));
+  let defY = Math.min(pBot - 6, Math.max(10, y(SL)));
   for(const gy of gridYs){ if(Math.abs(defY - gy) < 12){ defY = gy + 13; break; } }   // 跟刻度太近就往下錯開
-  g.fillStyle = ck.brokeStop ? '#f85149' : ACC; g.fillText((ck.brokeStop ? '已破 ' : '防守 ') + fmt(ck.lastLow), W - padR + 6, Math.min(pBot - 6, defY));
+  g.fillStyle = ck.brokeStop ? '#f85149' : ACC; g.fillText((ck.brokeStop ? '已破 ' : '停損 ') + fmt(SL), W - padR + 6, Math.min(pBot - 6, defY));
   // 頭/底轉折圈
   for(const m of ck.marks){
     const li = m.i - (ck.total - n);
@@ -4511,8 +4514,8 @@ async function renderAiInsight(stockId, name){
         const log = JSON.parse(localStorage.getItem('sigLog') || '{}');
         const prev = log[stockId];
         // 同一個判讀延續就保留「首次出現日與當時價」,判讀改變才更新——這樣「當時」才有意義
-        if(!prev || prev.t !== tag) log[stockId] = {d: end, t: tag, p: lastC, s: ckObj.lastLow};
-        else { prev.s = ckObj.lastLow; log[stockId] = prev; }
+        if(!prev || prev.t !== tag) log[stockId] = {d: end, t: tag, p: lastC, s: ckObj.stopUse};
+        else { prev.s = ckObj.stopUse; log[stockId] = prev; }
         const ids = Object.keys(log);
         if(ids.length > 30) ids.slice(0, ids.length - 30).forEach(k => delete log[k]);
         localStorage.setItem('sigLog', JSON.stringify(log));
@@ -4523,7 +4526,7 @@ async function renderAiInsight(stockId, name){
       const pb2 = s.length >= 2 ? s[s.length - 2].close : lastC;
       window.__cardD = ckObj ? {id: stockId, nm: (name || stockId), date: end, p: lastC, price: fmt(lastC),
         pct: pb2 > 0 ? (lastC - pb2) / pb2 * 100 : 0, verdict: ckObj.verdict, items: ckObj.items,
-        stop: ckObj.lastLow, brokeStop: !!ckObj.brokeStop, amp: ckObj.amp10, altStop: ckObj.altStop, nh40: !!ckObj.nh40, score: ckObj.score, nItems: ckObj.nItems} : null;
+        stop: ckObj.stopUse, brokeStop: !!ckObj.brokeStop, amp: ckObj.amp10, altStop: ckObj.altStop, nh40: !!ckObj.nh40, score: ckObj.score, nItems: ckObj.nItems} : null;
     }catch(e){ window.__cardD = null; }
     // ① 頂部膠囊:新手只看這排就有結論
     let pills = `<span class="pill">近5日 <b class="${cls(ret5)}">${pct(ret5)}</b></span>`;
@@ -4545,7 +4548,7 @@ async function renderAiInsight(stockId, name){
         ? `<span class="pill">⛔ <b class="down">已跌破防守 ${fmt(ckObj.lastLow)}</b></span>`
         : ckObj.breakdown
         ? `<span class="pill">⚠️ <b class="down">破底中・近距無防守</b></span>`
-        : `<span class="pill">🛡 防守 <b style="color:var(--accent);">${fmt(ckObj.lastLow)}</b></span>`;
+        : `<span class="pill">停損參考 <b style="color:var(--accent);">${fmt(ckObj.stopUse)}</b></span>`;
       if(ckObj.nh40) pills += `<span class="pill" style="border-color:var(--red);">🚀 <b class="up">創新高帶量</b></span>`;
     }
     // ② K 線圖(永遠可見,圖就是最好的語言)
