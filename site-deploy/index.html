@@ -427,7 +427,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-F';
+const APP_VER = 'v20261024-G';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -3159,6 +3159,7 @@ async function renderComeback(){
       const tc2 = $('topicCard');
       if(tc2 && tc2.parentNode) tc2.parentNode.insertBefore(card, tc2);
       else return;
+      try{ applyModeOrder(); }catch(e){}   // 新建的回訪卡依模式歸位(想進場:排在雷達後面)
     }
     card.innerHTML = `<h2 class="section" style="margin-top:0;">🔔 上次來之後——你查過的股票現在怎麼了</h2>`
       + `<p class="hint" style="margin:2px 0 8px;">${alert ? `<b style="color:var(--green);">${alert} 檔已跌破當時的防守位</b>,優先看;` : '都還在防守位之上;'}點卡片直接重跑今天最新的五燈與回測。</p>`
