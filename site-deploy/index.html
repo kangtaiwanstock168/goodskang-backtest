@@ -164,6 +164,9 @@
   }
   .subtitle{font-size:.8rem; color:var(--muted); margin:-8px 0 14px;}
   .dxChart{background:#0d1117; border:1px solid var(--border); border-radius:10px; padding:8px 4px 4px; margin:0 0 10px;} .dxChart canvas{display:block;} .dxLg{display:flex; flex-wrap:wrap; gap:4px 12px; padding:4px 8px 0; font-size:.76rem; color:var(--muted);} .dxLg i{display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:4px;}
+  .mkt{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:12px auto 0; max-width:760px;}
+  .mkt .m{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(88,166,255,.05); font-size:.88rem;}
+  .mkt .m b{font-weight:800;} .mkt .m .k{color:var(--muted); font-size:.8rem;}
   .dxTiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:6px 0 10px;}
   .dxTile{background:rgba(88,166,255,.05); border:1px solid var(--border); border-radius:10px; padding:8px 10px; line-height:1.4;}
   .dxTile .l{font-size:.75rem; color:var(--muted);} .dxTile .v{font-size:1.15rem; font-weight:800;} .dxTile .s{font-size:.8rem; color:var(--muted); margin-top:2px; line-height:1.5;}
@@ -188,14 +191,15 @@
     <p>每檔股票都有自己的股性——短線有短線的戲,長線有長線的答案。<br>
     今天誰在噴、這檔現在什麼狀態、長期怎麼買最划算——一站看完。</p>
     <div id="modeBar" style="margin:14px auto 0; max-width:720px;">
-      <p style="color:var(--text); font-weight:700; margin:0 0 8px;">今天想做什麼?</p>
+      <p style="color:var(--text); font-weight:700; margin:0 0 8px;">你今天的問題是哪一個?</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px;">
-        <button type="button" class="modeBtn" data-mode="hold" onclick="setMode('hold')">💼 持倉或買入計算<br><span>成本、張數 → 進出點與計畫卡</span></button>
-        <button type="button" class="modeBtn" data-mode="one" onclick="setMode('one')">🚦 看一檔燈號<br><span>五燈檢查表+進場劇本</span></button>
-        <button type="button" class="modeBtn" data-mode="long" onclick="setMode('long')">🐢 存股回測<br><span>六種策略、定期定額、年化 IRR</span></button>
+        <button type="button" class="modeBtn" data-mode="hold" onclick="setMode('hold')">💼 我有持倉<br><span>該減碼、續抱還是停損?算給我看</span></button>
+        <button type="button" class="modeBtn" data-mode="one" onclick="setMode('one')">🚦 想進場<br><span>這檔現在能不能買?守哪裡?</span></button>
+        <button type="button" class="modeBtn" data-mode="long" onclick="setMode('long')">🐢 想存股<br><span>定期定額還是等回檔?回測給你看</span></button>
       </div>
     </div>
-    <p style="margin-top:12px;">不報明牌、不喊進出——把數據攤開,你自己做決定。免費・免註冊。</p>
+    <div id="mktStrip" class="mkt" style="display:none;"></div>
+    <p style="margin-top:12px;">不報明牌、不喊進出——把數據攤開,你自己做決定。免費・免註冊。<br><span style="font-size:.82rem; opacity:.75;">本站所有內容為歷史統計與公開資料整理,非投資建議;投資有風險,損益自負。</span></p>
   </header>
 
   <div class="card" id="holdCard" style="display:none;">
@@ -244,7 +248,7 @@
       <div style="flex:0 1 200px; min-width:160px;"><button id="runBtnTop" onclick="run()">🚀 開始分析</button></div>
     </div>
     <p class="hint" style="margin-top:8px;">⚡ <b style="color:var(--text);">打完代號(或名稱)直接按——短線動能、五燈檢查表、標註 K 線馬上出來</b>,日期金額全都有預設,不用填。</p>
-    <p id="quickChips" style="margin-top:10px; font-size:.85rem; color:var(--muted);">🔥 熱門一鍵回測:
+    <p id="quickChips" style="margin-top:10px; font-size:.85rem; color:var(--muted);">🔥 熱門快選(點了直接分析):
       <button type="button" class="chip" onclick="quickRun('2330 台積電')">台積電</button>
       <button type="button" class="chip" onclick="quickRun('2317 鴻海')">鴻海</button>
       <button type="button" class="chip" onclick="quickRun('2454 聯發科')">聯發科</button>
@@ -380,7 +384,7 @@
 
   <footer>
     資料來源:FinMind 開放資料 API(當日盤後由 Yahoo/證交所/櫃買補充)|價格以收盤價計算,遇股票分割/除權息自動還原調整|股數含零股、未計手續費低消<br>
-    版本 v20261019-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
+    版本 v20261024-A|© 2026 阿康(goodskang)版權所有——本工具之設計與文案為原創,未經授權禁止複製或商業使用<br>
     本站僅記錄匿名使用統計(查詢代號與日期)以改善功能,不蒐集任何個人資料<br>
     本工具僅供歷史回測參考,不構成任何投資建議。投資有風險,請審慎評估。
   </footer>
@@ -402,7 +406,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261019-A';
+const APP_VER = 'v20261024-A';
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
 
 let chart = null;
@@ -727,8 +731,9 @@ function updateDcaHint(){
   renderComeback();     // 🔔 回訪變化摘要:你上次查的股票,現在怎麼了——回訪者的第一眼
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
   // 首次進站與「持倉或買入計算」模式不自動示範(省一輪載入,雷達先出來);看一檔/存股模式的回訪者才自動跑
-  const m0 = localStorage.getItem('mode');
-  if(fromShare || m0 === 'one' || m0 === 'long') setTimeout(() => { try{ run(true); }catch(e){} }, fromShare ? 400 : 1200);
+  // 2026-10 改版:只有分享連結才自動跑;一般回訪者不自動跑上一檔(省一輪載入,首頁不再一進來就 9,000px)
+  if(fromShare) setTimeout(() => { try{ run(true); }catch(e){} }, 400);
+  setTimeout(() => { try{ renderMktStrip(); }catch(e){} }, 800);   // 大盤體溫列:背景載入
 })();
 
 // 金額欄位即時加上千分位
@@ -1914,6 +1919,22 @@ function render(stockId, name, data, r, mas, taiex, cmp){
 function quickRun(v){ $('stockId').value = v; run(); }
 
 // 🧭 模式:hold=持倉或買入計算 / one=看一檔燈號 / long=存股回測——話題雷達+強勢雷達永遠在最上面(每個模式都需要),模式只決定下面的順序
+// 📊 大盤體溫列:散戶出手前先看「今天是不是能做多的日子」——加權指數今日/近 5 日,加上 0050 的五燈當大盤環境(0050 = 市場本身)
+async function renderMktStrip(){
+  const el = $('mktStrip'); if(!el) return;
+  try{
+    const [lb, R] = await Promise.all([fetchLiveBatch(['TAIEX']).catch(() => ({})), loadRecent('0050', true).catch(() => null)]); const live = lb && lb.TAIEX;   // 走自家 quote 函式(Yahoo 直連會被 CORS 擋)
+    const chips = [];
+    if(live && live.p > 0){ const pc = live.prev > 0 ? (live.p / live.prev - 1) * 100 : null; chips.push(`<span class="m">加權指數 <b>${Math.round(live.p).toLocaleString('zh-TW')}</b>${pc != null ? ` <b class="${pc >= 0 ? 'up' : 'down'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</b>` : ''}<span class="k">${(() => { const t = new Date(Date.now() + (8 * 60 + new Date().getTimezoneOffset()) * 60000); const hm = t.getHours() * 100 + t.getMinutes(), wd = t.getDay(); return (wd >= 1 && wd <= 5 && hm >= 900 && hm < 1335) ? '盤中' : '最近收盤'; })()}</span></span>`); }
+    if(R && R.s && R.s.length > 6){ const s = R.s, c = s[s.length - 1].close, c5 = s[s.length - 6].close; const d5 = (c / c5 - 1) * 100;
+      let ck = null; try{ ck = taChecklist(s, R.instNet); }catch(e){}
+      const env = !ck ? '' : ck.verdict.includes('不利') ? '<b class="down">偏空</b>' : (ck.verdict.includes('友善') || ck.verdict.includes('買點浮現')) ? '<b class="up">偏多</b>' : ck.verdict.includes('作頭') ? '<b style="color:var(--gold);">警戒</b>' : '<b style="color:var(--gold);">中性</b>';
+      chips.push(`<span class="m">0050 近 5 日 <b class="${d5 >= 0 ? 'up' : 'down'}">${d5 >= 0 ? '+' : ''}${d5.toFixed(1)}%</b></span>`);
+      if(ck) chips.push(`<span class="m">大盤環境 ${env} <span class="k">五燈 ${ck.score}/${ck.nItems}・${ck.verdict.includes('不利') ? '順勢框架今天不硬做多' : ck.verdict.includes('友善') ? '可依計畫出手' : '出手先縮小部位'}</span></span>`);
+    }
+    if(chips.length){ el.innerHTML = chips.join('') + '<span class="m k" style="border:0; background:none; color:var(--muted); font-size:.78rem;">以 0050 代表大盤;歷史統計非預測</span>'; el.style.display = 'flex'; }
+  }catch(e){}
+}
 function curMode(){ const m = localStorage.getItem('mode'); return (m === 'hold' || m === 'one' || m === 'long') ? m : 'one'; }
 function applyModeOrder(){
   const mode = curMode();
@@ -1922,10 +1943,11 @@ function applyModeOrder(){
   const formCard = $('stockId').closest('.card');
   const results = $('results'), hold = $('holdCard');
   if(hold) hold.style.display = mode === 'hold' ? 'block' : 'none';
-  cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb);
+  // 2026-10 改版:散戶進站第一件事是「打代號」——輸入框永遠在最上面,結果緊接在下;回訪卡、話題雷達、強勢股雷達排在後面(想找飆股的人往下滑)
   if(mode === 'hold'){ if(hold) cont.insertBefore(hold, wb); }
   cont.insertBefore(formCard, wb); if(results) cont.insertBefore(results, wb);
-  const cb = $('comebackCard'); if(cb){ const hdr = cont.querySelector('header'); cont.insertBefore(cb, hdr ? hdr.nextElementSibling : cont.firstElementChild); }
+  const cb = $('comebackCard'); if(cb) cont.insertBefore(cb, wb);
+  cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb);
   const dw = $('deepWrap'); if(dw) dw.open = (mode === 'long');
 }
 function setMode(m){
@@ -1955,7 +1977,7 @@ function renderHotChips(hot){
   const qc = $('quickChips');
   if(qc){
     const dyn = list.slice(2, 10);   // 0050、正2 固定在前,其餘跟著雷達走
-    qc.innerHTML = '🔥 熱門一鍵回測:' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join('');
+    qc.innerHTML = '🔥 熱門快選(點了直接分析):' + list.slice(0, 2).concat(dyn).map(h => `<button type="button" class="chip" onclick="quickRun('${h.id} ${h.name}')">${h.lb}</button>`).join('');
   }
 }
 function hPick(v){ const hs = $('hStock'); if(!hs) return; hs.value = v; $('suggest3').style.display = 'none'; $('hCost').focus(); }
@@ -3058,7 +3080,7 @@ async function renderComeback(){
       const c = r.chg >= 0 ? 'var(--red)' : 'var(--green)';
       // 判「不利/警戒」之後噴出=順勢框架沒接刀、錯過不是賠——要講清楚,不然看起來像工具報錯
       const bad = /不利|警戒/.test(r.tag);
-      const guard = r.broke ? '<b style="color:var(--green);">跌破防守 ✗</b>' : (r.chg >= 5 ? (bad ? '<b style="color:var(--red);">噴出 🔥</b> <span style="opacity:.7; font-size:.78rem;">(當時不接刀,錯過不是賠)</span>' : '<b style="color:var(--red);">噴出 🔥</b>') : '守住 ✓');
+      const guard = r.broke ? '<b style="color:var(--green);">跌破防守 ✗</b>' : (r.chg >= 5 ? (bad ? '<b style="color:var(--red);">噴出 🔥</b> <span style="opacity:.7; font-size:.78rem;">(當時不接刀,錯過不是賠)</span>' : '<b style="color:var(--red);">噴出 🔥</b>') : r.chg <= -3 ? '<b style="color:var(--gold);">回檔中・未破防守 ⚠</b>' : '守住 ✓');
       const divTag = r.div > 0 ? ` <span style="opacity:.65; font-size:.75rem;">含息 ${r.div.toFixed(2)}</span>` : '';
       return `<button type="button" class="chip" style="display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; padding:8px 12px; margin:4px 6px 2px 0; line-height:1.45; text-align:left;" onclick="quickRun('${r.id} ${r.nm.replace(/[<>'\"]/g, '')}')">`
         + `<span><b>${r.nm}</b> <span style="opacity:.65; font-size:.78rem;">${r.d.slice(5).replace('-', '/')} 判「${r.tag}」</span></span>`
