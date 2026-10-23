@@ -94,3 +94,5 @@ exports.handler = async (event) => {
       'netlify-cdn-cache-control': ok >= Math.ceil(list.length * 0.7) ? 'public, s-maxage=21600, stale-while-revalidate=86400, durable' : 'no-store'},
     body: JSON.stringify({t: new Date().toISOString(), list: out})};
 };
+
+exports.calcOne = calcOne;
