@@ -185,6 +185,9 @@
   .sigb b{display:block; font-size:.86rem;} .sigb span{display:block; font-size:.74rem; opacity:.9;}
   .sigb.g{border-color:var(--red); background:rgba(248,81,73,.08); color:var(--red);} .sigb.y{border-color:var(--gold); background:rgba(210,153,34,.08); color:var(--gold);}
   .sigb.o{border-color:#f0883e; background:rgba(240,136,62,.08); color:#f0883e;} .sigb.r{border-color:var(--green); background:rgba(63,185,80,.08); color:var(--green);}
+  .sgm{margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px; font-size:.92rem; font-weight:700;}
+  .sgm input{width:96px; padding:7px 9px; margin:0 4px; border-radius:8px; border:1px solid var(--accent); background:var(--bg); color:var(--text); font-size:1rem;}
+  .sgmr{display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:8px; font-weight:400;}
   .mkt{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:12px auto 0; max-width:760px;}
   .mkt .m{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(88,166,255,.05); font-size:.88rem;}
   .mkt .m b{font-weight:800;} .mkt .m .k{color:var(--muted); font-size:.8rem;}
@@ -427,8 +430,10 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261024-G';
-function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER}, params || {})); }
+const APP_VER = 'v20261024-H';
+// 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
+const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
+function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
 
 let chart = null;
 const $ = id => document.getElementById(id);
@@ -746,10 +751,14 @@ function updateDcaHint(){
     }
   }catch(e){}
   try{ renderWatch(); }catch(e){}   // 任何一塊壞掉都不能拖死整個初始化
-  renderWatchBoard();   // 回訪者的每日看板:背景載入,不擋自動示範
-  renderRadar();        // 盤後強勢股雷達:背景載入
-  renderTopic();        // 話題雷達(新聞熱度):背景載入
-  renderComeback();     // 🔔 回訪變化摘要:你上次查的股票,現在怎麼了——回訪者的第一眼
+  // 背景區塊(看板、雷達、話題、回訪卡):分享連結/App 內建瀏覽器進站時,先讓那一檔的結果出來,捲動或 6 秒後才載入——首屏只載一件事
+  let bgDone = false;
+  const bgLoad = () => { if(bgDone) return; bgDone = true;
+    renderWatchBoard(); renderRadar(); renderTopic(); renderComeback(); };
+  if(fromShare || IN_APP){
+    setTimeout(bgLoad, fromShare ? 6000 : 2500);
+    window.addEventListener('scroll', function f1(){ if(window.scrollY > 300){ window.removeEventListener('scroll', f1); bgLoad(); } }, {passive: true});
+  } else bgLoad();
   // 進站 1.2 秒後自動示範一次回測——訪客不用按任何鍵就看到工具的價值
   // 首次進站與「持倉或買入計算」模式不自動示範(省一輪載入,雷達先出來);看一檔/存股模式的回訪者才自動跑
   // 2026-10 改版:只有分享連結才自動跑;一般回訪者不自動跑上一檔(省一輪載入,首頁不再一進來就 9,000px)
@@ -1962,7 +1971,8 @@ window.__sigCache = window.__sigCache || {};
 let __sigQ = [], __sigRun = 0;
 function fillSigBadges(box){
   if(!box) return;
-  box.querySelectorAll('.stat.tap[data-sid]').forEach(el => { if(!el.dataset.sq){ el.dataset.sq = '1'; __sigQ.push(el); } });
+  // 卡片捲到畫面附近才算(省 API 額度與手機流量);不支援 IntersectionObserver 就直接全算
+  const enq = el => { if(!el.dataset.sq){ el.dataset.sq = '1'; __sigQ.push(el); pump(); } };
   const pump = async () => {
     while(__sigRun < 2 && __sigQ.length){
       const el = __sigQ.shift(), id = el.dataset.sid; __sigRun++;
@@ -1986,7 +1996,11 @@ function fillSigBadges(box){
       })();
     }
   };
-  pump();
+  const els = [...box.querySelectorAll('.stat.tap[data-sid]')];
+  if('IntersectionObserver' in window){
+    window.__sigIO = window.__sigIO || new IntersectionObserver(ents => ents.forEach(en => { if(en.isIntersecting){ window.__sigIO.unobserve(en.target); en.target.__enq && en.target.__enq(); } }), {rootMargin: '300px 0px'});
+    els.forEach(el => { el.__enq = () => enq(el); window.__sigIO.observe(el); });
+  } else els.forEach(enq);
 }
 // 📊 點擊來源追蹤:radar/topic 只記「有顯示」,不知道有沒有人點——這裡補記「從哪裡點進分析」與當下訊號
 document.addEventListener('click', e => {
@@ -3703,8 +3717,36 @@ function taChecklist(s, instNet){
   return {items, score, nItems, stop: stop + ampNote, entry, verdict, marks: pv.slice(-6), ma20, lastLow, closes: c, total: n, breakdown: farNote === 'BREAK', brokeStop, nh40, amp10, altStop, sig};
 }
 const SIG_DISC = '此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負';
-function sigCardHtml(g){
+// 💼 訊號卡內嵌持倉試算:只填成本,不用切模式、不用填張數——損益、到停損/停利各是多少%、現在該做什麼
+function sgCalc(){
+  const g = window.__sigLast, el = $('sgOut'); if(!g || !el) return;
+  const c = parseFloat(String($('sgCost').value).replace(/[^\d.]/g, ''));
+  if(!(c > 0)){ el.innerHTML = ''; return; }
+  const p = v => `<b class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</b>`;
+  const now = (g.px - c) / c * 100;
+  let rows = `<div>目前損益 ${p(now)}</div>`;
+  if(g.stop > 0) rows += `<div>跌到停損 ${fmt(g.stop)} → ${p((g.stop - c) / c * 100)}</div>`;
+  if(g.tp1 > 0) rows += `<div>${g.cls === 'o' ? '反彈到壓力' : '漲到停利①'} ${fmt(g.tp1)} → ${p((g.tp1 - c) / c * 100)}</div>`;
+  let act;
+  if(g.cls === 'r') act = now < 0 ? `停損條件已觸發:目前 ${now.toFixed(1)}%,照紀律出場、不攤平` : `跌破防守,但你還有 ${now.toFixed(1)}% 獲利:先出場保住獲利`;
+  else if(g.cls === 'o') act = now >= 0 ? `空方結構、你還有獲利:可先減碼一半,剩下的跌破 ${fmt(g.stop)} 出場` : `空方結構:反彈到壓力 ${fmt(g.tp1 || g.px)} 附近減碼,跌破 ${fmt(g.stop)} 出場`;
+  else if(g.stop > 0 && g.stop > c) act = `停損價已高於你的成本:這筆最差也是小賺出場,續抱`;
+  else if(now >= 20) act = `已獲利 ${now.toFixed(1)}%:可先分批停利一部分,其餘停損上移到 ${fmt(g.stop)}`;
+  else act = g.stop > 0 ? `續抱,跌破 ${fmt(g.stop)} 出場(屆時 ${((g.stop - c) / c * 100).toFixed(1)}%)` : '續抱觀察';
+  el.innerHTML = `<div class="sgmr">${rows}</div><p style="margin:6px 0 0; font-weight:700;">👉 ${act}</p>`
+    + `<a href="javascript:void(0)" onclick="sgToHold()" style="color:var(--accent); font-size:.85rem;">🧮 再填張數,算金額與完整交易計畫卡 →</a>`;
+  clearTimeout(window.__sgT); window.__sgT = setTimeout(() => track('sig_cost', {stock: g.sid, sig: g.cls}), 1500);
+}
+function sgToHold(){
+  const g = window.__sigLast; if(!g) return;
+  setMode('hold');
+  const nm = (stockList || []).find(s2 => s2.id === g.sid)?.name || '';
+  $('hStock').value = `${g.sid} ${nm}`.trim(); $('hCost').value = $('sgCost').value;
+  setTimeout(() => { try{ $('hLots').focus(); }catch(e){} }, 500);
+}
+function sigCardHtml(g, sid){
   if(!g) return '';
+  if(sid){ window.__sigLast = Object.assign({sid}, g); }
   const pc = v => `<span style="opacity:.75; font-size:.85em;">(${v >= 0 ? '+' : ''}${v.toFixed(1)}%)</span>`;
   const row = (k, v, why, col) => `<div class="sgr"><span class="sgk">${k}</span><span class="sgv"${col ? ` style="color:${col};"` : ''}>${v}</span><span class="sgw">${why}</span></div>`;
   let h = `<div class="sgc ${g.cls}"><div class="sgh"><b class="sgt">${g.tag}</b><span class="sga">${g.act}</span></div>`;
@@ -3716,7 +3758,9 @@ function sigCardHtml(g){
     if(g.tp2 > 0) h += row('停利參考②', `<b>${fmt(g.tp2)}</b> ${pc(g.tp2Pct)}`, g.tp2Why, 'var(--red)');
   }
   if(g.rr > 0 && g.zone) h += row('報酬風險比', `<b>${g.rr.toFixed(1)} : 1</b>`, g.rr >= 2 ? '賺賠比合格(≥2)' : g.rr >= 1 ? '賺賠比普通,部位縮小' : '賺的空間小於賠的空間');
-  h += `<p class="sgo">💼 ${g.holdAct}</p><p class="sgd">⚠️ ${SIG_DISC}。價位依頭底結構、月線與前高自動計算。</p></div>`;
+  h += `<p class="sgo">💼 ${g.holdAct}</p>`;
+  if(sid) h += `<div class="sgm">💼 我有這檔,成本 <input id="sgCost" type="text" inputmode="decimal" placeholder="例:${fmt(g.px * 0.95, g.px >= 100 ? 0 : 2)}" oninput="sgCalc()" autocomplete="off"> 元<div id="sgOut"></div></div>`;
+  h += `<p class="sgd">⚠️ ${SIG_DISC}。價位依頭底結構、月線與前高自動計算。</p></div>`;
   return h;
 }
 
@@ -4280,7 +4324,7 @@ async function renderAiInsight(stockId, name){
           + `</div>`;
       }
     }catch(e){}
-    box.innerHTML = `<div style="margin-bottom:2px;">${pills}<span id="pePill"></span></div>` + (ckObj ? sigCardHtml(ckObj.sig) : '') + `<div id="peBox"></div>` + newsHtml + dayHtml + chartHtml
+    box.innerHTML = `<div style="margin-bottom:2px;">${pills}<span id="pePill"></span></div>` + (ckObj ? sigCardHtml(ckObj.sig, stockId) : '') + `<div id="peBox"></div>` + newsHtml + dayHtml + chartHtml
       + `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:12px;">${proseHtml}${ckBoxHtml}</div>`;
     try{ if(ckObj) drawKChart($('kchart'), s.slice(-45), ckObj); }catch(e){}
     try{ posTab(localStorage.getItem('posMode') || 'A'); }catch(e){}
