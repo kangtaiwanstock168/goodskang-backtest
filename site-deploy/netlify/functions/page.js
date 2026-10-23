@@ -418,14 +418,14 @@ async function analyze(id){
   const n2 = s.length; const exDiv = (dv || []).some(x => s.length && x.date === s[n2 - 1].date);
   return {id, nm, ind, s, ck, raw, exDiv, chg: n2 > 1 && s[n2 - 2].close > 0 ? (s[n2 - 1].close - s[n2 - 2].close) / s[n2 - 2].close * 100 : 0, date: s.length ? s[s.length - 1].date : '', instNet};
 }
-const CSS = `body{margin:0;background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.75}
-.w{max-width:860px;margin:0 auto;padding:18px 16px 60px}a{color:#58a6ff}h1{font-size:1.45rem;line-height:1.4;margin:6px 0}h2{font-size:1.12rem;color:#d29922;border-left:4px solid #d29922;padding-left:10px;margin:28px 0 10px}
-.crumb{font-size:.82rem;color:#8b949e}.px{font-size:2rem;font-weight:800}.up{color:#f85149}.down{color:#3fb950}.muted{color:#8b949e;font-size:.85rem}
-.card{border:1px solid #30363d;border-radius:12px;padding:14px 16px;background:#161b22;margin:12px 0}.tag{font-size:1.3rem;font-weight:800}
-table{width:100%;border-collapse:collapse}td,th{padding:8px 6px;border-top:1px solid #30363d;text-align:left;vertical-align:top}th{color:#8b949e;font-weight:400;width:7.5em}
-.cta{display:block;text-align:center;margin:18px 0;padding:14px;border-radius:12px;background:#1f6feb;color:#fff;font-weight:800;text-decoration:none;font-size:1.05rem}
-.disc{font-size:.8rem;color:#d29922;border:1px dashed #d29922;border-radius:8px;padding:8px 12px;margin-top:18px}.links a{display:inline-block;margin:3px 6px 3px 0;padding:3px 10px;border:1px solid #30363d;border-radius:999px;text-decoration:none;font-size:.86rem}
-details{margin:8px 0}summary{cursor:pointer;font-weight:700}`;
+const CSS = `body{margin:0;background:#000;color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,"SF Pro TC","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}
+.w{max-width:820px;margin:0 auto;padding:28px 18px 64px}a{color:#2997ff;text-decoration:none}h1{font-size:2rem;line-height:1.25;letter-spacing:-.01em;margin:8px 0 6px}h2{font-size:1.35rem;margin:36px 0 12px;letter-spacing:-.01em}
+.crumb{font-size:.82rem;color:#86868b}.px{font-size:2.6rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.up{color:#ff453a}.down{color:#30d158}.muted{color:#86868b;font-size:.85rem}
+.card{border-radius:22px;padding:20px;background:#1c1c1e;margin:14px 0}.tag{font-size:1.6rem;font-weight:700}
+table{width:100%;border-collapse:collapse}td,th{padding:10px 6px;border-top:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}th{color:#86868b;font-weight:400;width:7.5em}
+.cta{display:block;text-align:center;margin:22px 0;padding:15px;border-radius:14px;background:#2997ff;color:#fff;font-weight:600;font-size:1.02rem}
+.disc{font-size:.78rem;color:#86868b;margin-top:22px}.links a{display:inline-block;margin:4px 6px 4px 0;padding:6px 12px;background:#1c1c1e;border-radius:999px;font-size:.86rem;color:#f5f5f7}
+details{margin:10px 0;background:#1c1c1e;border-radius:16px;padding:12px 16px}summary{cursor:pointer;font-weight:600}details p{color:#c7c7cc;margin:8px 0 0}`;
 const DISC = '此為根據目前數據參考顯示,非人為買賣建議,投資有賺有賠風險自負。';
 function shell({title, desc, canon, body, ld}){
   return `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
