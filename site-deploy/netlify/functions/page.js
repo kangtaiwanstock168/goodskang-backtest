@@ -518,6 +518,32 @@ exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   const seg = String(event.path || '').replace(/\/+$/, '').split('/').pop() || '';
   if(q.sitemap || /^sitemap(\.xml)?$/i.test(seg)) return sitemap();
+  // /list → 股票代號名稱清單(搜尋框用):全站共用 CDN 快取一天,手機不用自己抓 FinMind 整包
+  if(/\/list$/.test(String(event.path || '')) || q.list){
+    const info = await get('TaiwanStockInfo');
+    if(!info || !info.length) return {statusCode: 503, headers: {'cache-control': 'no-store'}, body: '[]'};
+    const seen = new Map(); for(const s of info) if(/^\d{4,6}[A-Z]?$/.test(s.stock_id) && !seen.has(s.stock_id)) seen.set(s.stock_id, s.stock_name);
+    return {statusCode: 200, headers: {'content-type': 'application/json', 'cache-control': 'public, max-age=3600', 'netlify-cdn-cache-control': 'public, s-maxage=86400, stale-while-revalidate=604800, durable'}, body: JSON.stringify([...seen])};
+  }
+  // /picks → 今日進場訊號榜:強勢股雷達+話題雷達+常客,每檔訊號(走本站 /sig 的 CDN 快取),🟢 排前面
+  if(/\/picks$/.test(String(event.path || '')) || q.picks){
+    const base = process.env.URL || SITE, k = String(q.k || '').replace(/\D/g, '').slice(0, 8);
+    const [scan, news] = await Promise.all([fetch(base + '/.netlify/functions/scan').then(r => r.json()).catch(() => ({})), fetch(base + '/.netlify/functions/news').then(r => r.json()).catch(() => ({}))]);
+    const src = {};
+    for(const x of (scan.list || [])) src[x.id] = src[x.id] || {name: x.name, from: x.k ? '人氣' : '強勢', pct: x.pct};
+    for(const x of (news.top || []).slice(0, 15)) src[x.id] = src[x.id] || {name: NAME[x.id] || '', from: '新聞', n: x.n};
+    for(const id of ['2330', '2317', '2454', '2303', '0050']) src[id] = src[id] || {name: NAME[id] || '', from: '常客'};
+    const ids = Object.keys(src).slice(0, 36), out = [], t0 = Date.now();
+    for(let i = 0; i < ids.length && Date.now() - t0 < 7500; i += 6){
+      const part = await Promise.all(ids.slice(i, i + 6).map(id => fetch(`${base}/.netlify/functions/page/sig/${id}?k=${k}`).then(r => r.json()).catch(() => null)));
+      part.forEach((g, j) => { if(g && g.cls) out.push(Object.assign({name: src[ids[i + j]].name || NAME[ids[i + j]] || '', from: src[ids[i + j]].from, pct: src[ids[i + j]].pct}, g)); });
+    }
+    const ord = {g: 0, y: 1, o: 2, r: 3};
+    out.sort((a, b) => (ord[a.cls] - ord[b.cls]) || ((b.rr || 0) - (a.rr || 0)));
+    const full = out.length >= Math.min(ids.length, 20);
+    return {statusCode: 200, headers: {'content-type': 'application/json', 'cache-control': 'public, max-age=600', 'netlify-cdn-cache-control': full ? 'public, s-maxage=86400, stale-while-revalidate=86400, durable' : 'public, s-maxage=300'},
+      body: JSON.stringify({k, d: scan.d || '', n: ids.length, list: out})};
+  }
   // /sig/:id → 雷達卡徽章用的精簡訊號(JSON),CDN 快取 6 小時:全站共用一份,手機不用自己抓 5 支 API 算
   if(/\/sig\/[^/]+$/.test(String(event.path || '')) || q.sig){
     const id = String(q.sig || seg).toUpperCase().trim();
@@ -528,7 +554,7 @@ exports.handler = async (event) => {
     const g = r.ck.sig;
     const lite = {id, date: r.date, cls: g.cls, tag: g.tag, act: strip(g.act), zone: g.zone, zoneWhy: strip(g.zoneWhy), stop: g.stop, stopPct: g.stopPct, stopWhy: g.stopWhy,
       tp1: g.tp1, tp1Pct: g.tp1Pct, tp1Why: g.tp1Why, tp2: g.tp2, tp2Pct: g.tp2Pct, tp2Why: g.tp2Why, rr: g.rr, px: g.px, holdAct: strip(g.holdAct), score: r.ck.score, nItems: r.ck.nItems, verdict: strip(r.ck.verdict), d5: r.s.length > 6 ? (r.s[r.s.length - 1].close / r.s[r.s.length - 6].close - 1) * 100 : null};
-    return {statusCode: 200, headers: Object.assign(hdr, {'netlify-cdn-cache-control': 'public, s-maxage=21600, stale-while-revalidate=86400, durable'}), body: JSON.stringify(lite)};
+    return {statusCode: 200, headers: Object.assign(hdr, {'netlify-cdn-cache-control': q.k ? 'public, s-maxage=86400, stale-while-revalidate=86400, durable' : 'public, s-maxage=21600, stale-while-revalidate=86400, durable'}), body: JSON.stringify(lite)};
   }
   const idRaw = q.id || (/^(stock|page|hub)$/i.test(seg) ? '' : seg);
   if(q.hub || !idRaw) return hubPage();
