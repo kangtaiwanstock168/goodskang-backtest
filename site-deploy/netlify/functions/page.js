@@ -12,7 +12,7 @@ const strip = s => String(s || '').replace(/<[^>]+>/g, '');
 const ymd = d => d.toISOString().slice(0, 10);
 async function get(ds, id, start, end){
   for(let a = 0; a < 2; a++){
-    try{ const q = {dataset: ds, data_id: id}; if(start) q.start_date = start; if(end) q.end_date = end;
+    try{ const q = {dataset: ds}; if(id) q.data_id = id; if(start) q.start_date = start; if(end) q.end_date = end;
       const j = await (await fetch(FM + new URLSearchParams(q))).json(); if(j.status === 200) return j.data || []; }catch(e){}
     await new Promise(r => setTimeout(r, 700));
   }
