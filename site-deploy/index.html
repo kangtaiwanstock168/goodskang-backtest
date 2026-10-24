@@ -371,6 +371,7 @@
   .pka{color:var(--muted); font-size:1.2rem;}
   .pkMore{margin-top:10px; background:transparent; color:var(--accent); padding:8px; font-weight:600;}
   @media (max-width:640px){ .pkList{grid-template-columns:1fr;} .pkv{font-size:.84rem;} }
+  .pkv{min-width:0; max-width:62vw; overflow:hidden;} .pkv, .pkv i{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;} .pk{grid-template-columns:12px minmax(84px,auto) minmax(0,1fr) 12px;}
 </style>
 </head>
 <body>
@@ -619,7 +620,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261025-F';
+const APP_VER = 'v20261025-G';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -715,6 +716,7 @@ async function loadStockList(){
       if(!seen.size){ const json = await (await fetch('https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo')).json();
         for(const s of (json.data || [])) if(/^\d{4,6}[A-Z]?$/.test(s.stock_id) && !seen.has(s.stock_id)) seen.set(s.stock_id, s.stock_name); }
       stockList = [...seen].map(([id,name]) => ({id, name}));
+      try{ if(PICKS) renderPicks(); }catch(e){}
       try{ localStorage.setItem('twStockList', JSON.stringify({t:Date.now(), list:stockList})); }catch(e){}
       return stockList;
     })();
@@ -2179,13 +2181,15 @@ async function loadPicks(){
     try{ colorChips(); }catch(e){}
     try{ document.querySelectorAll('.stat.tap[data-sid]').forEach(el => { const g = window.__sigCache[el.dataset.sid]; const b = el.querySelector('.sigb'); if(g && b && /算訊號/.test(b.textContent)) paintBadge(b, g); }); }catch(e){}
     renderPicks();
+    if(!stockList && PICKS.some(x => !x.name)) loadStockList().then(() => renderPicks()).catch(() => {});
   }catch(e){ box.innerHTML = '<p class="hint">訊號榜暫時讀不到,下方雷達仍可使用。</p>'; }
 }
 var pickShowAll = false;
 function renderPicks(){
   const box = $('pickBox'); if(!box || !PICKS) return;
   const g = PICKS.filter(x => x.cls === 'g'), y = PICKS.filter(x => x.cls === 'y'), bad = PICKS.filter(x => x.cls === 'o' || x.cls === 'r');
-  const row = x => `<button type="button" class="pk ${x.cls}" onclick="quickRun('${x.id} ${String(x.name || '').replace(/[<>'"]/g, '')}')"><span class="pkd"></span><span class="pkn"><b>${x.name || x.id}</b><i>${x.id}・${x.from}</i></span><span class="pkv">${x.cls === 'g' ? `進場 ${x.zone}<i>停損 ${fmt(x.stop)}${x.tp1 > 0 ? `・停利 ${fmt(x.tp1)}` : ''}</i>` : x.cls === 'y' ? (x.zone ? `等拉回 ${x.zone}<i>${String(x.act).slice(0, 18)}</i>` : `${String(x.zoneWhy || '等條件').replace(/才轉為可進場$/, '').slice(0, 20)}<i>${String(x.act).slice(0, 18)}</i>`) : `${x.cls === 'r' ? '停損訊號' : '減碼訊號'}<i>${String(x.act).slice(0, 20)}</i>`}</span><span class="pka">›</span></button>`;
+  const nmOf = x => x.name || ((stockList || []).find(s2 => s2.id === x.id) || {}).name || x.id;
+  const row = x => `<button type="button" class="pk ${x.cls}" onclick="quickRun('${x.id} ${String(nmOf(x)).replace(/[<>'"]/g, '')}')"><span class="pkd"></span><span class="pkn"><b>${nmOf(x)}</b><i>${x.id}・${x.from}</i></span><span class="pkv">${x.cls === 'g' ? `進場 ${x.zone}<i>停損 ${fmt(x.stop)}${x.tp1 > 0 ? `・停利 ${fmt(x.tp1)}` : ''}</i>` : x.cls === 'y' ? (x.zone ? `等拉回 ${x.zone}<i>${x.act}</i>` : `${String(x.zoneWhy || '等條件').replace(/才轉為可進場$/, '')}<i>${x.act}</i>`) : `${x.cls === 'r' ? '停損訊號' : '減碼訊號'}<i>${x.act}</i>`}</span><span class="pka">›</span></button>`;
   const list = pickShowAll ? g.concat(y, bad) : g.concat(y).slice(0, Math.max(6, g.length));
   box.innerHTML = `<div class="pkSum"><span><b class="up">${g.length}</b> 檔可進場</span><span><b class="gold">${y.length}</b> 檔觀望</span><span><b class="down">${bad.length}</b> 檔減碼/停損</span></div>`
     + (g.length ? '' : '<p class="hint" style="margin:4px 0 10px;">今天熱門股裡沒有符合進場條件的——大盤回檔時這是常態,先看觀望名單等拉回。</p>')
