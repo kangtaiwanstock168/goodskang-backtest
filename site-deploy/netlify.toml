@@ -30,3 +30,7 @@
   from = "/sitemap.xml"
   to = "/.netlify/functions/page/sitemap"
   status = 200
+
+# 每日預熱:台灣時間週一到週五 14:40、14:50(收盤資料進來後)先算好進場訊號榜、熱門股訊號、ETF 專區
+[functions."warm"]
+  schedule = "40,50 6 * * 1-5"

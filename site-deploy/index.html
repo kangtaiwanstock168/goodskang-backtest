@@ -361,6 +361,16 @@
   .hgrid select{width:100%; padding:13px 12px;}
   .hcost{display:flex; gap:8px;} .hcost input{flex:1;} .hcost button{width:auto; flex:0 0 auto; background:var(--card2); color:var(--accent); padding:0 14px; font-size:.92rem;}
   @media (max-width:640px){ .hgrid{grid-template-columns:repeat(3,1fr); gap:10px;} .hgrid .span2{grid-column:1 / -1;} }
+  .pkSum{display:flex; gap:18px; flex-wrap:wrap; font-size:.92rem; color:var(--muted); margin:0 0 12px;} .pkSum b{font-size:1.25rem; margin-right:2px;}
+  .pkList{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:8px;}
+  .pk{display:grid; grid-template-columns:12px minmax(0,1fr) auto 12px; align-items:center; gap:12px; text-align:left; background:var(--card2); color:var(--text); border-radius:16px; padding:14px 14px; font-weight:400; width:100%;}
+  .pk:hover{background:var(--card3); filter:none;}
+  .pkd{width:10px; height:10px; border-radius:50%; background:var(--muted);} .pk.g .pkd{background:var(--red); box-shadow:0 0 10px rgba(255,69,58,.7);} .pk.y .pkd{background:var(--gold);} .pk.o .pkd{background:var(--orange);} .pk.r .pkd{background:var(--green);}
+  .pkn b{display:block; font-size:1rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;} .pkn i,.pkv i{display:block; font-style:normal; color:var(--muted); font-size:.76rem;}
+  .pkv{text-align:right; font-size:.88rem; font-weight:600; font-variant-numeric:tabular-nums;} .pk.g .pkv{color:var(--red);} .pk.y .pkv{color:var(--gold);} .pk.o .pkv{color:var(--orange);} .pk.r .pkv{color:var(--green);}
+  .pka{color:var(--muted); font-size:1.2rem;}
+  .pkMore{margin-top:10px; background:transparent; color:var(--accent); padding:8px; font-weight:600;}
+  @media (max-width:640px){ .pkList{grid-template-columns:1fr;} .pkv{font-size:.84rem;} }
 </style>
 </head>
 <body>
@@ -433,6 +443,12 @@
     <div class="etfAdd">✍️ 清單沒有你要的?輸入 ETF 代號加入比較:<input id="etfIn" type="text" placeholder="例:00881" autocomplete="off" onkeydown="if(event.key==='Enter')etfAdd()"><button type="button" onclick="etfAdd()">加入</button><span id="etfAddMsg"></span></div>
     <div id="etfBox"><p class="hint">⏳ 抓今日成交量前 30 名+常見存股 ETF 的三年資料與配息紀錄…(第一次約 10 秒,之後全站共用快取)</p></div>
     <p class="hint" id="etfHint" style="margin-top:10px; line-height:1.7;"></p>
+  </div>
+
+  <div class="card" id="pickCard" style="display:none;">
+    <h2 class="section" style="margin-top:0;">今天的進場訊號</h2>
+    <p class="subtitle">強勢股、新聞熱門股與權值股,每天收盤後自動算好。可進場的排最前面,點一下看完整價位與 K 線。</p>
+    <div id="pickBox"><p class="hint">讀取中…</p></div>
   </div>
 
   <div class="card">
@@ -603,7 +619,7 @@ if(GA_ID){
   window.gtag = function(){ dataLayer.push(arguments); };
   gtag('js', new Date()); gtag('config', GA_ID);
 }
-const APP_VER = 'v20261025-E';
+const APP_VER = 'v20261025-F';
 // 📱 App 內建瀏覽器(YouTube/IG/FB/LINE):GA 實測平均只停 18 秒(Chrome 3 分鐘)——偵測到就走輕量載入
 const IN_APP = (() => { try{ const u = navigator.userAgent || ''; return /FBAN|FBAV|Instagram|Line\/|YouTube|com\.google\.ios\.youtube|GSA\/|; wv\)/i.test(u) || (/iPhone|iPad/.test(u) && !/Safari\//.test(u)); }catch(e){ return false; } })();
 function track(evt, params){ if(GA_ID && window.gtag) gtag('event', evt, Object.assign({app_ver: APP_VER, inapp: IN_APP ? 1 : 0}, params || {})); }
@@ -693,10 +709,11 @@ async function loadStockList(){
   }catch(e){}
   if(!stockListLoading){
     stockListLoading = (async () => {
-      const json = await (await fetch('https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo')).json();
       const seen = new Map();
-      for(const s of (json.data || []))
-        if(/^\d{4,6}[A-Z]?$/.test(s.stock_id) && !seen.has(s.stock_id)) seen.set(s.stock_id, s.stock_name);
+      // 先抓本站 CDN 的精簡清單(約 1/10 大小),失敗才直連 FinMind 整包
+      try{ const arr = await (await fetch('/.netlify/functions/page/list')).json(); if(Array.isArray(arr) && arr.length > 500) for(const [id, nm] of arr) seen.set(id, nm); }catch(e){}
+      if(!seen.size){ const json = await (await fetch('https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo')).json();
+        for(const s of (json.data || [])) if(/^\d{4,6}[A-Z]?$/.test(s.stock_id) && !seen.has(s.stock_id)) seen.set(s.stock_id, s.stock_name); }
       stockList = [...seen].map(([id,name]) => ({id, name}));
       try{ localStorage.setItem('twStockList', JSON.stringify({t:Date.now(), list:stockList})); }catch(e){}
       return stockList;
@@ -2131,7 +2148,7 @@ async function renderMktStrip(){
   const el = $('mktStrip'); if(!el) return;
   try{
     // 0050 訊號改抓伺服器快取(全站共用),手機不用自己抓 5 支 API
-    const [lb, g] = await Promise.all([fetchLiveBatch(['TAIEX']).catch(() => ({})), fetch('/.netlify/functions/page/sig/0050').then(r => r.json()).catch(() => null)]);
+    const [lb, g] = await Promise.all([fetchLiveBatch(['TAIEX']).catch(() => ({})), fetch('/.netlify/functions/page/sig/0050?k=' + sigKey()).then(r => r.json()).catch(() => null)]);
     const live = lb && lb.TAIEX;
     const tiles = [];
     const sg = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
@@ -2149,7 +2166,37 @@ async function renderMktStrip(){
 function curMode(){ const m = localStorage.getItem('mode'); return (m === 'hold' || m === 'one' || m === 'long') ? m : 'one'; }
 // 🚦 雷達卡訊號徽章:每張熱門卡背景跑一次訊號卡(同時最多 2 檔、同一檔同一天只算一次)——想進場的人不用一張張點
 window.__sigCache = window.__sigCache || {};
-let __sigQ = [], __sigRun = 0;
+// 快取鍵:台灣時間 14:35(收盤資料進來)換一天——伺服器與每日預熱用同一把鑰匙,收盤後第一位訪客就拿到新資料
+function sigKey(){ return (() => { const t = new Date(Date.now() + 8 * 3600e3); if(t.getUTCHours() * 60 + t.getUTCMinutes() < 14 * 60 + 35) t.setUTCDate(t.getUTCDate() - 1); return t.toISOString().slice(0, 10).replace(/-/g, ''); })(); }
+// 🎯 今日進場訊號榜(想進場模式置頂):伺服器把強勢股、話題股、常客的訊號一次算好(每日預熱+CDN),🟢 排最前面
+var PICKS = null;
+async function loadPicks(){
+  const box = $('pickBox'); if(!box) return;
+  try{
+    const j = await fetch('/.netlify/functions/page/picks?k=' + sigKey()).then(r => r.json());
+    PICKS = (j.list || []);
+    for(const g of PICKS) window.__sigCache[g.id] = g;
+    try{ colorChips(); }catch(e){}
+    try{ document.querySelectorAll('.stat.tap[data-sid]').forEach(el => { const g = window.__sigCache[el.dataset.sid]; const b = el.querySelector('.sigb'); if(g && b && /算訊號/.test(b.textContent)) paintBadge(b, g); }); }catch(e){}
+    renderPicks();
+  }catch(e){ box.innerHTML = '<p class="hint">訊號榜暫時讀不到,下方雷達仍可使用。</p>'; }
+}
+var pickShowAll = false;
+function renderPicks(){
+  const box = $('pickBox'); if(!box || !PICKS) return;
+  const g = PICKS.filter(x => x.cls === 'g'), y = PICKS.filter(x => x.cls === 'y'), bad = PICKS.filter(x => x.cls === 'o' || x.cls === 'r');
+  const row = x => `<button type="button" class="pk ${x.cls}" onclick="quickRun('${x.id} ${String(x.name || '').replace(/[<>'"]/g, '')}')"><span class="pkd"></span><span class="pkn"><b>${x.name || x.id}</b><i>${x.id}・${x.from}</i></span><span class="pkv">${x.cls === 'g' ? `進場 ${x.zone}<i>停損 ${fmt(x.stop)}${x.tp1 > 0 ? `・停利 ${fmt(x.tp1)}` : ''}</i>` : x.cls === 'y' ? (x.zone ? `等拉回 ${x.zone}<i>${String(x.act).slice(0, 18)}</i>` : `${String(x.zoneWhy || '等條件').replace(/才轉為可進場$/, '').slice(0, 20)}<i>${String(x.act).slice(0, 18)}</i>`) : `${x.cls === 'r' ? '停損訊號' : '減碼訊號'}<i>${String(x.act).slice(0, 20)}</i>`}</span><span class="pka">›</span></button>`;
+  const list = pickShowAll ? g.concat(y, bad) : g.concat(y).slice(0, Math.max(6, g.length));
+  box.innerHTML = `<div class="pkSum"><span><b class="up">${g.length}</b> 檔可進場</span><span><b class="gold">${y.length}</b> 檔觀望</span><span><b class="down">${bad.length}</b> 檔減碼/停損</span></div>`
+    + (g.length ? '' : '<p class="hint" style="margin:4px 0 10px;">今天熱門股裡沒有符合進場條件的——大盤回檔時這是常態,先看觀望名單等拉回。</p>')
+    + `<div class="pkList">${list.map(row).join('')}</div>`
+    + (PICKS.length > list.length || pickShowAll ? `<button type="button" class="pkMore" onclick="pickShowAll=!pickShowAll;renderPicks()">${pickShowAll ? '收起' : `看全部 ${PICKS.length} 檔`}</button>` : '');
+}
+function paintBadge(b, g){
+  const kv = g.cls === 'g' ? `進場 ${g.zone}・停損 ${fmt(g.stop)}` : g.cls === 'y' ? (g.zone ? `等拉回 ${g.zone}` : String(g.zoneWhy || '等條件成立').replace(/才轉為可進場$/, '').slice(0, 22)) : g.cls === 'o' ? (g.stop > 0 ? `持有者跌破 ${fmt(g.stop)} 出場` : '持有者減碼') : '空手不進場';
+  b.innerHTML = `<b>${g.tag}</b><span>${kv}</span>`; b.className = 'sigb ' + g.cls;
+}
+var __sigQ = [], __sigRun = 0;
 // 熱門快選按鈕也掛上訊號燈(沿用雷達算好的結果,不另外抓資料)
 function colorChips(){
   document.querySelectorAll('#quickChips button.chip').forEach(b => {
@@ -2169,7 +2216,7 @@ function fillSigBadges(box){
         let g = window.__sigCache[id];
         try{
           // 伺服器算好、CDN 快取(全站共用):手機只抓一支小 JSON,不再每張卡自己打 5 支 API
-          if(g === undefined){ const j = await fetch('/.netlify/functions/page/sig/' + encodeURIComponent(id)).then(r => r.json()); g = (j && !j.none && j.cls) ? j : null; window.__sigCache[id] = g; }
+          if(g === undefined){ const j = await fetch('/.netlify/functions/page/sig/' + encodeURIComponent(id) + '?k=' + sigKey()).then(r => r.json()); g = (j && !j.none && j.cls) ? j : null; window.__sigCache[id] = g; }
         }catch(e){ g = null; }
         const b = el.querySelector('.sigb');
         if(b){
@@ -2203,9 +2250,9 @@ document.addEventListener('click', e => {
   }catch(err){}
 }, true);
 // 🐢 ETF 存股專區:資料由 /.netlify/functions/etf 伺服器端算好(三組平行,CDN 快取 6 小時)
-let ETF = null, etfCat = '全部', etfLoading = false;
-const ETF_CATS = ['全部', '市值型', '高股息', '主題型', '主動式', '海外', '債券', '槓桿/反向', '自選'];
-let ETF_HOT_D = '';
+var ETF = null, etfCat = '全部', etfLoading = false;
+var ETF_CATS = ['全部', '市值型', '高股息', '主題型', '主動式', '海外', '債券', '槓桿/反向', '自選'];
+var ETF_HOT_D = '';
 // 熱門榜進來的 ETF 依代號尾碼與名稱自動分類(順序有意義:槓桿/債券/主動先判)
 function etfCatOf(id, nm){
   nm = nm || '';
@@ -2323,6 +2370,7 @@ function applyModeOrder(){
   else { if(cb) cont.insertBefore(cb, wb); cont.insertBefore($('topicCard'), wb); cont.insertBefore($('radarCard'), wb); }
   const dw = $('deepWrap'); if(dw) dw.open = (mode === 'long');
   const bw = $('btWrap'); if(bw) bw.open = (mode === 'long');
+  const pc0 = $('pickCard'); if(pc0){ pc0.style.display = mode === 'one' ? 'block' : 'none'; if(mode === 'one'){ cont.insertBefore(pc0, formCard); if(!PICKS) loadPicks(); } }
   const ec = $('etfCard'); if(ec){ ec.style.display = mode === 'long' ? 'block' : 'none'; if(mode === 'long'){ cont.insertBefore(ec, formCard); renderEtf(); loadEtf(); } }
 }
 function setMode(m){
